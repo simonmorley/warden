@@ -66,4 +66,6 @@ npm run check       # typecheck, then tests
 npm run deploy
 ```
 
-Local runs keep each ledger's SQLite state under `.wrangler/`. Inference always calls Workers AI, even locally, so it needs `npx wrangler login`.
+Local runs keep each ledger's SQLite state under `.wrangler/`. Inference always calls Workers AI, even locally, so Wrangler needs credentials. Either run `npx wrangler login`, or put `CLOUDFLARE_API_TOKEN=…` in a `.env` at the repository root (gitignored).
+
+The Worker's scripts load that file with Node's `--env-file-if-exists`, which puts it into Wrangler's process environment only. Wrangler's own `--env-file` flag would also expose the token to the Worker as a binding, and the Worker never needs an account credential. `npm run dev:host` binds every interface, for reaching a development box over Tailscale.
