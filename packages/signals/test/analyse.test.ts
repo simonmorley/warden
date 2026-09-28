@@ -70,6 +70,23 @@ describe("form signals", () => {
     },
   );
 
+  it("raises seed_phrase_request for a grid of recovery-phrase word fields", () => {
+    const words = Array.from({ length: 12 }, (_, n) => `<input name="word${n + 1}">`).join("");
+    expect(ids(`<form>${words}</form>`)).toContain("seed_phrase_request");
+  });
+
+  it.each(["Enter your 24-word recovery phrase to restore your wallet", "Type your secret recovery phrase", "Import using your seed phrase"])(
+    "raises seed_phrase_request when the page asks for one in words: %j",
+    (text) => {
+      expect(ids(`<p>${text}</p><textarea name="restore"></textarea>`)).toContain("seed_phrase_request");
+    },
+  );
+
+  it("doesn't raise seed_phrase_request for an ordinary multi-field form", () => {
+    const html = '<input name="first_name"><input name="last_name"><input name="email"><input name="phone">';
+    expect(ids(html)).not.toContain("seed_phrase_request");
+  });
+
   it("raises form_posts_offsite with the host that receives the data", () => {
     expect(detail("form_posts_offsite", '<form action="https://collect.northwind-verify.invalid/submit"></form>')).toContain(
       "collect.northwind-verify.invalid",
