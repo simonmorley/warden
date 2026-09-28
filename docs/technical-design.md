@@ -105,7 +105,7 @@ Signals and a bounded excerpt in, structured verdict out. The only component tha
 
 **Responsibilities.** Build the request, call the model, validate the response, resolve cited signal ids. Temperature 0, structured output (JSON mode) from a model that supports it, and server-side validation regardless — the mode is a convenience, not a guarantee.
 
-**Guarantees.** Page-derived content is delimited and never concatenated into instructions. A response that fails the schema, cites a signal id that doesn't exist, times out or errors is rejected and routed to a human, earning nothing either way. `uncertain` is a valid verdict and also routes to a human. The raw response is recorded whatever happens.
+**Guarantees.** Page-derived content is delimited and never concatenated into instructions. A response that fails the schema, cites a signal id that doesn't exist, calls a page phishing without citing any signal, times out or errors is rejected and routed to a human, earning nothing either way. `uncertain` is a valid verdict and also routes to a human. The raw response is recorded whatever happens.
 
 **Boundary.** It decides nothing about permission. A rejection here is an input to the engine, not a judgment on the AI.
 

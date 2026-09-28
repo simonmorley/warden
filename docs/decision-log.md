@@ -6,6 +6,16 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — A phishing verdict must cite evidence
+
+**Changed.** The PRD required every cited signal to exist, which an empty citation list satisfies vacuously. Now a `phishing` verdict must cite at least one extracted signal, or it is rejected like any other malformed response. `not_phishing` and `uncertain` may cite nothing.
+
+**Why.** "Why was this blocked?" must always have an answer, and "the model said so" isn't one. A phishing verdict pointing at nothing checkable shouldn't be able to earn or exercise permission to block.
+
+**Raised by.** Claude Code, while writing the inference adapter's tests.
+
+**Docs.** PRD §6.1, technical design §3E.
+
 ## 2026-09-28 — PhishTank joins the candidate sources
 
 **Changed.** PhishTank is added to the feeds used to find fixture candidates.

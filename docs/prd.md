@@ -106,7 +106,7 @@ Two consequences:
 Only verdicts where **the AI said "phishing"** count, and only if:
 
 - the response was well-formed (valid JSON matching the schema)
-- every signal id it cited exists in the extracted signals
+- it cited at least one signal, and every signal id it cited exists in the extracted signals
 - a human has since labelled it right or wrong
 
 Everything else is excluded, and the exclusions are fixed in advance, not settled once the outcome is known:
