@@ -6,6 +6,24 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — Review lags behind the decisions, then catches up before the traps
+
+**Changed.** In a demo run, ground truth used to land the instant each page was decided. Now it lags five steps behind, from step 130 to step 190, and is immediate either side.
+
+**Why.** Found by running the demo for real rather than reasoning about it. The first live run made 117 automatic blocks and never once showed more than zero unreviewed: each block was reviewed the moment it was made, so the cap of three never bound. One of the design's two damage-bounding mechanisms was invisible in the demonstration of it.
+
+Making review lag fixed that and broke something else. With review permanently behind, the cap stayed full, so when the traps arrived they queued for a person like everything else — and the run ended in AUTONOMOUS with nothing to revoke. The lag now stops at step 190 so the backlog drains before the traps land.
+
+A run now shows both: 28 pages queued because the cap was full, and the full arc of promotion, revocation and two reversals.
+
+**What this says about the cap.** Under sustained load with review behind, the system spends much of its time refusing to act on its own — three blocks out, everything else to a person. That is the mechanism working as designed, and it is worth seeing rather than describing.
+
+**Raised by.** Claude Code, from a live run.
+
+**Docs.** None; the plan's shape is an implementation detail of the fixture set.
+
+---
+
 ## 2026-09-28 — The model is llama-3.3-70b-instruct-fp8-fast, chosen on false positives
 
 **Changed.** The Workers AI model is now decided: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. The PRD had left it to "whatever produces reliable structured output".

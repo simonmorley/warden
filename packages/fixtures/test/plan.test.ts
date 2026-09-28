@@ -57,6 +57,14 @@ describe("the demo plan", () => {
     expect(delayed.length).toBeGreaterThan(20);
   });
 
+  it("drains the backlog before the traps, so a trap can still reach a free cap slot", () => {
+    // With review permanently lagging, the cap stays full and every trap queues for a person
+    // instead of being blocked — and the run ends with nothing to revoke.
+    const firstTrap = indexOf((fixture) => fixture.category === "weaponised_report");
+    const runUp = plan.slice(firstTrap - 12, firstTrap);
+    for (const step of runUp) expect(step.labelDelay).toBe(0);
+  });
+
   it("keeps pages after the last trap, so a rejected retry has somewhere to show", () => {
     const lastTrap = plan.map((step) => step.fixture.category).lastIndexOf("weaponised_report");
     expect(plan.length - lastTrap).toBeGreaterThan(3);

@@ -14,6 +14,20 @@ const FIRST_MISTAKE_AT = 25;
 const TAIL_PAGES = 20;
 /** Steps a trap's ground truth waits, so its block is visibly unreviewed before it is judged. */
 const TRAP_LABEL_DELAY = 2;
+/**
+ * From here on, ground truth lags the decision. Before this point labels land at once so the
+ * record builds; after it, blocks accumulate unreviewed and the cap of 3 starts to bind —
+ * which is the only way a demo shows the mechanism that bounds the damage.
+ */
+const REVIEW_LAG_FROM = 130;
+/**
+ * And catches up here. If review lagged all the way to the traps the cap would still be full
+ * when they arrived, every one would queue for a person, and the run would end with nothing
+ * to revoke — so the backlog drains first.
+ */
+const REVIEW_LAG_UNTIL = 190;
+/** How far review runs behind while it lags. Enough that the cap binds and pages queue. */
+const REVIEW_LAG = 5;
 
 /**
  * The order a demo run walks the set in, built to produce the arc in PRD section 13. The
@@ -43,14 +57,14 @@ export function demoPlan(): DemoStep[] {
     before.splice(FIRST_MISTAKE_AT + Math.floor((offset + 1) * (earning.length / spread.length)), 0, fixture);
   }
 
-  return [
-    ...before.map(immediately),
-    ...traps.map((fixture) => ({ fixture, labelDelay: TRAP_LABEL_DELAY })),
-    ...tail.map(immediately),
-  ];
-}
+  const earningPhase = before.map((fixture, index) => ({
+    fixture,
+    labelDelay: index >= REVIEW_LAG_FROM && index < REVIEW_LAG_UNTIL ? REVIEW_LAG : 0,
+  }));
 
-/** A step whose ground truth is applied as soon as the page is decided. */
-function immediately(fixture: Fixture): DemoStep {
-  return { fixture, labelDelay: 0 };
+  return [
+    ...earningPhase,
+    ...traps.map((fixture) => ({ fixture, labelDelay: TRAP_LABEL_DELAY })),
+    ...tail.map((fixture) => ({ fixture, labelDelay: 0 })),
+  ];
 }
