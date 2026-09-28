@@ -10,6 +10,17 @@ export function problem(status: number, error: string, message: string, headers:
 }
 
 /**
+ * Whether this Worker is running on someone's own machine.
+ *
+ * `.dev.vars` is read by `wrangler dev` and by no deployment, so a value set there is a
+ * reliable signal for local. It means a cloned repository works straight away with no
+ * credential to paste, while anything deployed is always guarded.
+ */
+export function runningLocally(env: { WARDEN_OPEN?: string }): boolean {
+  return env.WARDEN_OPEN === "true";
+}
+
+/**
  * Checks the bearer token in constant time. Both sides are hashed first so that
  * timingSafeEqual always compares equal lengths. A server with no token configured
  * accepts nothing, rather than everything.

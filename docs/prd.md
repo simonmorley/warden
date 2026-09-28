@@ -248,7 +248,7 @@ flowchart TD
 | **Workers** | The API, signal extraction, dashboard |
 | **Workers AI** | The classifier. Temperature 0, structured output, validated server-side |
 | **Durable Object** | Permission state, track record, blocklist and history. Authorising and blocking happen in one call, next to the data, one request at a time |
-| **AI Gateway** | Every model call goes through it, for raw-response logging and rate limiting |
+| **AI Gateway** *(optional)* | Set one and every model call routes through it, for raw-response logging and rate limiting. A gateway belongs to an account, so a clone configures its own or does without |
 | **R2** *(optional)* | Page snapshots, if they outgrow bundled fixtures |
 
 **Not used:** KV (eventually consistent, so unsafe for showing a block was removed), D1, Queues, Vectorize, Browser Rendering. Each is reasonable later; none is needed here.
@@ -273,7 +273,7 @@ The page is written by the attacker. Treat everything from it as hostile.
 - Require a strict response schema. Reject anything that doesn't match.
 - Check that every signal id the model cites exists in the extracted signals.
 - Render page content in the dashboard as escaped text. Never execute it.
-- Require the token on every endpoint that changes state or spends inference — starting a demo run and classifying a page both cost real model calls.
+- Require a token on every endpoint that changes state or spends inference — starting a demo run and classifying a page both cost real model calls. A Worker running on someone's own machine is exempt, which `.dev.vars` signals and no deployment can: a clone works immediately, and anything reachable by others is always guarded.
 - Compare the token in constant time.
 - Serve the dashboard under a strict Content-Security-Policy.
 
@@ -303,7 +303,7 @@ Inference runs concurrently ahead of the ledger while submissions stay in fixtur
 
 The set carries more than one trap, so a model that resists the first still meets another. If it resists them all, the run ends without a revocation and the dashboard says so plainly.
 
-**Try it live.** Separately, pick a fixture or paste a snapshot and classify it on the spot. The screen shows the verdict, the evidence it cited, whether validation passed and what the permission check returned. The page joins the live ledger's human queue.
+**Try it live.** Separately, paste a snapshot and classify it on the spot. The screen shows the verdict, the evidence it cited, whether validation passed and what the permission check returned. The page joins the live ledger's human queue.
 
 ## 14. The dashboard
 

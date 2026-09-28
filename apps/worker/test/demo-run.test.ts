@@ -79,9 +79,9 @@ describe("the demo run API", () => {
         method: "POST",
         headers: token === null ? {} : { authorization: `Bearer ${token}` },
       }),
-      { ...env, WARDEN_TOKEN: TOKEN },
+      { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" },
     );
-  const get = (path: string) => app.fetch(new Request(`https://warden.test${path}`), { ...env, WARDEN_TOKEN: TOKEN });
+  const get = (path: string) => app.fetch(new Request(`https://warden.test${path}`), { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" });
 
   it("needs the token to start a run, because every run spends real inference", async () => {
     expect((await post("/demo/runs", null)).status).toBe(401);
@@ -110,7 +110,7 @@ describe("the demo run API", () => {
     const empty = createApp({ model: () => model, liveLedgerName: () => "live:unused", demoPlan: () => [] });
     const res = await empty.fetch(
       new Request("https://warden.test/demo/runs", { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } }),
-      { ...env, WARDEN_TOKEN: TOKEN },
+      { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" },
     );
 
     expect(res.status).toBe(503);

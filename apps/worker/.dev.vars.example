@@ -1,4 +1,5 @@
-# Copy to .dev.vars for local development; it is gitignored.
-# The bearer token for endpoints that change state or spend inference.
-# In production: npx wrangler secret put WARDEN_TOKEN
+# Set by wrangler dev only, never by a deploy: lets a local run work with no token.
+WARDEN_OPEN=true
+
+# Only needed if you deploy. In production: npx wrangler secret put WARDEN_TOKEN
 WARDEN_TOKEN=change-me

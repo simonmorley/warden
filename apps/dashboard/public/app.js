@@ -33,8 +33,8 @@ function appendChild(node, child) {
   node.append(child instanceof Node ? child : document.createTextNode(String(child)));
 }
 
-// The token lives in this tab only, and the page still works when storage is blocked.
-const TOKEN_KEY = "warden-token";
+// Which run this tab is watching. No credential is ever held here: a local run needs none,
+// and a deployed one is driven by the CLI, which reads its token from the environment.
 const RUN_KEY = "warden-demo-run";
 
 /** Reads a per-tab value, or "" when there is none or storage is blocked. */
@@ -59,13 +59,10 @@ function store(key, value) {
   }
 }
 
-let token = stored(TOKEN_KEY);
-
-/** Calls the API with the token, if there is one. Never throws: failures come back as { ok: false }. */
+/** Calls the API same-origin. Never throws: failures come back as { ok: false }. */
 async function api(method, path, body) {
   const headers = {};
   if (body !== undefined) headers["content-type"] = "application/json";
-  if (token) headers.authorization = `Bearer ${token}`;
   try {
     const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = await res.json().catch(() => null);
@@ -77,7 +74,9 @@ async function api(method, path, body) {
 
 /** A sentence for a failed call. */
 function explain(res) {
-  if (res.status === 401) return "That needs the access token (top right).";
+  if (res.status === 401) {
+    return "This instance is deployed and guarded, so the dashboard can't drive it. Use the CLI, which reads its token from the environment.";
+  }
   return res.data?.message ?? `The server answered ${res.status}.`;
 }
 
@@ -370,23 +369,6 @@ $("try-form").addEventListener("submit", async (event) => {
   loadLive();
 });
 
-// The token.
-
-/** Says whether a token is set for this tab. */
-function reflectToken() {
-  $("token-state").textContent = token ? "Token set for this tab." : "Viewing is open; anything that spends inference or changes state needs the token.";
-}
-
-$("token-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  token = $("token").value.trim();
-  store(TOKEN_KEY, token);
-  $("token").value = "";
-  reflectToken();
-  showBanner("");
-});
-
-reflectToken();
 loadLive();
 setInterval(loadLive, 10_000);
 const lastRun = stored(RUN_KEY);

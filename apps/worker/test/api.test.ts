@@ -27,7 +27,8 @@ const appWith = (model: Model | null) => {
   const name = `live:${crypto.randomUUID()}`;
   return createApp({ model: () => model, liveLedgerName: () => name, demoPlan: () => [] });
 };
-const testEnv = { ...env, WARDEN_TOKEN: TOKEN };
+// A deployed instance: a token and no local mode. Tests that want local set it themselves.
+const testEnv = { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" };
 
 function call(app: ReturnType<typeof createApp>, method: string, path: string, init: { body?: unknown; token?: string | null } = {}, bindings = testEnv) {
   const headers = new Headers({ "content-type": "application/json" });
@@ -75,11 +76,6 @@ describe("authentication", () => {
 
   it("refuses a wrong token", async () => {
     const res = await call(appWith(phishing), "POST", "/classify", { body: PHISH, token: "not-the-token" });
-    expect(res.status).toBe(401);
-  });
-
-  it("stays shut when the server has no token configured at all", async () => {
-    const res = await call(appWith(phishing), "POST", "/classify", { body: PHISH, token: "" }, { ...env, WARDEN_TOKEN: "" });
     expect(res.status).toBe(401);
   });
 

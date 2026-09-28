@@ -64,29 +64,9 @@ body {
   color: var(--muted);
 }
 
-.token {
-  display: grid;
-  gap: 0.3rem;
-  min-width: min(100%, 22rem);
-}
 
-.token label,
 .try label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-}
 
-.inline {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 
 main {
   display: grid;

@@ -1,6 +1,6 @@
 import { DEFAULT_POLICY } from "@warden/engine";
 import { pageIdentity } from "@warden/signals";
-import { authorised, BadRequest, json, problem, readObject, requireString } from "./http";
+import { authorised, BadRequest, json, problem, readObject, requireString, runningLocally } from "./http";
 import type { DemoStep } from "./demo";
 import type { Model } from "./inference/classify";
 import type { Scope } from "./ledger";
@@ -57,7 +57,8 @@ export function createApp(dependencies: Dependencies) {
           allow: Object.keys(route).join(", "),
         });
       }
-      if (handler.auth && !(await authorised(request, env.WARDEN_TOKEN))) {
+      const permitted = runningLocally(env) || (await authorised(request, env.WARDEN_TOKEN));
+      if (handler.auth && !permitted) {
         return problem(401, "unauthorised", "This needs a valid bearer token.", { "www-authenticate": "Bearer" });
       }
 

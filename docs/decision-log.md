@@ -6,6 +6,22 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — No credential in the browser, and no deployment by default
+
+**Changed.** Three things, from one question: how does a stranger who clones this repository actually run it?
+
+- **The dashboard no longer asks for an access token.** It had a password field you pasted a shared secret into, which the page kept in `sessionStorage`. That is gone. Protected endpoints are open when `WARDEN_OPEN=true` is set in `.dev.vars` — a file `wrangler dev` reads and no deploy ever does, which makes it a reliable "this is my own machine" signal. A deployment has no such file, so it always requires its token, and the CLI supplies it from the environment. A deployment with neither fails closed.
+- **AI Gateway is optional, not required.** A gateway belongs to one account, so ours is useless to anyone else. Set `AI_GATEWAY_ID` and calls route through yours; leave it unset and they go straight to Workers AI. The adapter already worked this way; the PRD was overstating it.
+- **Nothing is deployed by default.** A public instance spends the owner's inference on whoever finds it — which is what produced the token field in the first place. `npm run dev` against your own account is the better story for a repository people clone.
+
+**Why it matters beyond tidiness.** A shared secret typed into a web form is the weakest part of any of this: it can't be attributed to a person, can't be revoked for one person, and teaches the habit of pasting credentials into pages. The PRD already said Cloudflare Access is the right answer for a real deployment, and removing the field stops pretending a form is a substitute.
+
+**Raised by.** Simon: "I don't want the access token in a form", and the two questions about who would use our gateway and why we would deploy at all.
+
+**Docs.** PRD §10, §12 and §13; `CLAUDE.md`.
+
+---
+
 ## 2026-09-28 — Review lags behind the decisions, then catches up before the traps
 
 **Changed.** In a demo run, ground truth used to land the instant each page was decided. Now it lags five steps behind, from step 130 to step 190, and is immediate either side.

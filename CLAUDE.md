@@ -47,7 +47,7 @@ Warden is phishing triage where an AI classifier has to earn, and can lose, perm
 - Ledgers are SQLite-backed Durable Objects, one instance per ledger, called through RPC methods.
 - Use bindings, not REST APIs. Keep no request-scoped state in module globals.
 - The Worker sees every request first (`run_worker_first`) and serves the dashboard through the `ASSETS` binding. Routing and security headers are then the same in tests, `wrangler dev` and production.
-- Workers AI calls go through AI Gateway.
+- Workers AI calls route through AI Gateway when `AI_GATEWAY_ID` is set, and go direct when it isn't. A gateway belongs to one account, so it can't be a requirement for anyone who clones this.
 
 ## Layout
 
@@ -73,5 +73,7 @@ npm run deploy
 ```
 
 Local runs keep each ledger's SQLite state under `.wrangler/`. Inference always calls Workers AI, even locally, so Wrangler needs credentials. Either run `npx wrangler login`, or put `CLOUDFLARE_API_TOKEN=…` in a `.env` at the repository root (gitignored).
+
+A local run needs no application credential: `WARDEN_OPEN=true` in `.dev.vars` says "this is my own machine", and `.dev.vars` is read by `wrangler dev` and by no deploy. Nothing asks a person to paste a secret into a page. A deployment sets `WARDEN_TOKEN` with `wrangler secret put` and is driven by the CLI.
 
 The Worker's scripts load that file with Node's `--env-file-if-exists`, which puts it into Wrangler's process environment only. Wrangler's own `--env-file` flag would also expose the token to the Worker as a binding, and the Worker never needs an account credential. `npm run dev:host` binds every interface, for reaching a development box over Tailscale.
