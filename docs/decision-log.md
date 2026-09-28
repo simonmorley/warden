@@ -6,6 +6,22 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — SQL moves into a storage layer, and the schema into versioned migrations
+
+**Changed.**
+- The ledger Durable Object used to carry its schema as one CREATE TABLE string, with SQL written inline throughout its methods.
+- Now the schema is a list of append-only migrations, one file each, applied in order and recorded in `_migrations`. Each migration commits atomically with its record.
+- Every query is a named, parameterised statement in `LedgerStore`. The Durable Object only orchestrates: engine, store, transactions.
+- A ledger opened by older code is migrated before its first call. One that was never opened is still left untouched.
+
+**Why.**
+- A schema string in a class can't evolve without breaking ledgers that already exist.
+- Inline SQL mixed with orchestration is hard to review: you can't see every statement the ledger runs in one place, or check each one is parameterised.
+
+**Raised by.** The user, reviewing the ledger code.
+
+**Docs.** `CLAUDE.md` (code quality rules).
+
 ## 2026-09-28 — A phishing verdict must cite evidence
 
 **Changed.** The PRD required every cited signal to exist, which an empty citation list satisfies vacuously. Now a `phishing` verdict must cite at least one extracted signal, or it is rejected like any other malformed response. `not_phishing` and `uncertain` may cite nothing.
