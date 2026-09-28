@@ -13,6 +13,10 @@
         <h1>Warden</h1>
         <p>Phishing triage where the AI has to earn the right to act.</p>
       </div>
+      <div id="live-status" class="live-status" title="What Warden is currently allowed to do on the pages you send it">
+        <span class="live-status-label">Live system</span>
+        <span id="live-status-mode" class="live-status-mode">—</span>
+      </div>
       <nav class="nav" aria-label="Sections">
         <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
         <button id="nav-try" type="button" class="tab">Send a page</button>
@@ -132,20 +136,24 @@
       <section id="page-demo" hidden aria-labelledby="demo-title">
         <div class="section-head">
           <h2 id="demo-title">Watch it earn permission</h2>
-          <button id="run-demo" type="button">Run the demo</button>
-          <button id="clear-demo" type="button" class="secondary" hidden>Clear</button>
+          <div class="actions">
+            <button id="run-demo" type="button">Run the demo</button>
+            <button id="clear-demo" type="button" class="secondary" hidden>Clear</button>
+          </div>
         </div>
-        <p class="note">
-          The demo feeds Warden a set of pages whose real answer we already know, one after another, and confirms each
-          verdict against that answer — standing in for the analyst who would normally do it. Every verdict is a live
-          model call. Nothing is scripted, so the model can and does get some wrong.
+        <p class="sandbox">
+          <b>This is a rehearsal.</b> Every run gets its own throwaway record and cannot touch the one under
+          <b>Review</b>. Nothing here grants or removes any permission that outlives the run.
         </p>
         <p class="note">
-          Watch permission build as the evidence accumulates, then watch it disappear when a page carrying a planted
-          instruction talks the model into blocking something legitimate.
+          About 150 pages whose real answers are already known, fed through one after another, each verdict confirmed
+          against that answer — standing in for the analyst who would normally do it. Every verdict is a live model
+          call, so nothing is scripted and the model does get some wrong. Takes two to three minutes; you can leave
+          and come back, and refreshing keeps your place.
         </p>
         <div id="demo" class="ledger" aria-live="polite"><p class="empty">No run yet.</p></div>
       </section>
+
     </main>
   </body>
 </html>

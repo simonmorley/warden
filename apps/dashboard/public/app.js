@@ -192,6 +192,34 @@ function tally(t) {
   return `${t.right} correct of ${t.right + t.wrong} · proven accuracy ${pct(t.bound)}`;
 }
 
+/** What each change actually means for what Warden may do next. */
+const MEANING = {
+  promoted: "From here on it may do more without asking.",
+  demoted: "Back to recommending: nothing is blocked automatically until the evidence recovers.",
+  probation_restarted: "The ten clean calls it needs must now start over.",
+  revoked: "Everything it had earned is gone. It must build the whole record again from nothing.",
+  reversed: "That URL is no longer blocked. A person's judgement undid what the AI did.",
+};
+
+/** The state change an event caused, shown as it moved: from one mode to the other. */
+function transition(event) {
+  const pairs = {
+    promoted: [event.from, event.to],
+    demoted: [event.from, "SHADOW"],
+    revoked: ["AUTONOMOUS", "SHADOW"],
+  };
+  const pair = pairs[event.kind];
+  if (!pair) return null;
+  const [from, to] = pair;
+  return el(
+    "span",
+    { class: "transition" },
+    el("span", { class: `state ${from}` }, STATES[from].label),
+    el("span", { class: "arrow" }, "→"),
+    el("span", { class: `state ${to}` }, STATES[to].label),
+  );
+}
+
 /** An event as a headline and the receipt behind it. */
 function describe(recorded, urlOf) {
   const { event } = recorded;
@@ -216,7 +244,10 @@ function describe(recorded, urlOf) {
 
 /** A demo run's progress in words. */
 function runText(run) {
-  if (run.status === "running") return `Running: page ${run.next} of ${run.total}`;
+  if (run.status === "running") {
+    const left = timeLeft(run);
+    return `Running: page ${run.next} of ${run.total}${left ? ` · ${left}` : ""}`;
+  }
   if (run.status === "done") return `Finished: all ${run.total} pages classified`;
   return `Stopped after ${run.next} of ${run.total} pages: ${run.reason}`;
 }
@@ -245,7 +276,8 @@ function runProgress(run, state) {
   const parts = [
     el("span", { class: `status ${run.status}` }, runText(run)),
     el("progress", { value: run.next, max: run.total }),
-    journey(state),
+    ladder(state),
+    story(state, run),
     el("div", { class: "cost" }, costOf(state.decisions.length)),
   ];
   const rebuilding = run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
@@ -311,6 +343,65 @@ function standing(state) {
       ),
     ),
   ];
+}
+
+/** Where the run stands on the same ladder the front page explains, lit as it climbs. */
+function ladder(state) {
+  const rungs = [
+    ["SHADOW", "Recommends only", "every verdict goes to a person"],
+    ["EARNING", "On trial", "strong enough, not yet proved"],
+    ["AUTONOMOUS", "Acts alone", "blocks URLs by itself"],
+  ];
+  const reached = new Set(["SHADOW"]);
+  for (const recorded of state.events) {
+    if (recorded.event.kind === "promoted") reached.add(recorded.event.to);
+  }
+
+  return el(
+    "ol",
+    { class: "ladder live" },
+    rungs.flatMap(([key, name, note], index) => {
+      const classes = ["rung", key.toLowerCase()];
+      if (reached.has(key)) classes.push("been");
+      if (state.permission.state === key) classes.push("here");
+      const rung = el(
+        "li",
+        { class: classes.join(" ") },
+        el("span", { class: "rung-name" }, name),
+        el("span", { class: "rung-note" }, state.permission.state === key ? "← it is here now" : note),
+      );
+      if (index === rungs.length - 1) return [rung];
+      return [rung, el("li", { class: "gate", "aria-hidden": "true" }, el("span", {}, index === 0 ? "73 confirmed correct" : "10 more in a row"))];
+    }),
+  );
+}
+
+/** The run as the story it is, so someone who looks away knows what they missed. */
+function story(state, run) {
+  const kinds = state.events.map((recorded) => recorded.event.kind);
+  const promotions = state.events.filter((recorded) => recorded.event.kind === "promoted");
+  const blocked = state.decisions.filter((decision) => decision.route.to === "block").length;
+  const revoked = kinds.includes("revoked");
+  const undone = kinds.filter((kind) => kind === "reversed").length;
+  const capFull = state.decisions.filter((decision) => decision.route.reason === "cap_full").length;
+  const running = run.status === "running";
+
+  const beats = [
+    [state.permission.right > 0, `Built a record — ${state.permission.right} confirmed-correct calls so far`],
+    [promotions.some((p) => p.event.to === "EARNING"), "Cleared the bar, and went on trial"],
+    [promotions.some((p) => p.event.to === "AUTONOMOUS"), "Passed the trial — allowed to act alone"],
+    [blocked > 0, `Blocked ${blocked} URL${blocked === 1 ? "" : "s"} with no person involved`],
+    [capFull > 0, `Hit the cap ${capFull} time${capFull === 1 ? "" : "s"} — three blocks awaiting review, so the rest queued`],
+    [revoked, `Fooled by a planted instruction — permission revoked, ${undone} block${undone === 1 ? "" : "s"} undone`],
+  ];
+  const next = beats.find(([done]) => !done);
+
+  return el(
+    "ol",
+    { class: "story" },
+    beats.map(([done, text]) => el("li", { class: done ? "beat done" : "beat" }, text)),
+    running && next ? el("li", { class: "beat waiting" }, `Waiting: ${next[1].toLowerCase()}`) : null,
+  );
 }
 
 /**
@@ -404,6 +495,7 @@ function eventList(events, urlOf, container, hasDecisions) {
       return el(
         "li",
         { class: recorded.event.kind },
+        transition(recorded.event),
         el(
           "button",
           {
@@ -414,6 +506,7 @@ function eventList(events, urlOf, container, hasDecisions) {
           },
           headline,
         ),
+        el("span", { class: "meaning" }, MEANING[recorded.event.kind] ?? ""),
         el("span", { class: "receipt" }, receipt),
       );
     }),
@@ -636,6 +729,20 @@ function labelCell(decision, onLabel) {
 // Demo runs.
 let demoTimer;
 let lastDemoState = null;
+// Measured progress, so "how much longer" is an observation rather than a guess.
+let pace = null;
+
+/** Roughly how long is left, from the rate this run has actually managed. */
+function timeLeft(run) {
+  const now = Date.now();
+  if (!pace || pace.runId !== run.runId) pace = { runId: run.runId, at: now, done: run.next };
+  const elapsed = now - pace.at;
+  const progressed = run.next - pace.done;
+  if (elapsed < 4000 || progressed <= 0) return null;
+  const seconds = Math.round(((run.total - run.next) * elapsed) / progressed / 1000);
+  if (seconds < 20) return "nearly done";
+  return `about ${Math.ceil(seconds / 30) * 30} seconds left`;
+}
 
 $("demo").addEventListener("rerender", () => {
   if (lastDemoState) renderLedger($("demo"), lastDemoState);
@@ -647,8 +754,8 @@ async function watchDemo(runId) {
   const res = await api("GET", `/demo/runs/${encodeURIComponent(runId)}`);
   if (!res.ok) return demoUnavailable(res);
 
-  lastDemoState = res.data;
-  renderLedger($("demo"), res.data);
+  lastDemoState = { ...res.data, run: res.data.run ? { ...res.data.run, runId } : res.data.run };
+  renderLedger($("demo"), lastDemoState);
   const running = res.data.run?.status === "running";
   $("run-demo").disabled = running;
   $("run-demo").textContent = running ? "Running…" : res.data.run ? "Run it again" : "Run the demo";
@@ -686,11 +793,24 @@ async function loadLive() {
     return;
   }
   lastLiveState = res.data;
+  showLiveStatus(res.data.permission);
   const waiting = res.data.decisions.filter((decision) => decision.label === null).length;
   $("queue-count").textContent = waiting === 0 ? "" : String(waiting);
   renderLedger($("live"), res.data, { onLabel: labelLive });
 }
 
+
+/**
+ * What the live system is allowed to do, in the masthead, colour-coded and on every page.
+ * It is the one fact a viewer should never have to go looking for.
+ */
+function showLiveStatus(permission) {
+  const state = STATES[permission.state];
+  const mode = $("live-status-mode");
+  mode.textContent = state.label;
+  mode.className = `live-status-mode ${permission.state}`;
+  $("live-status").title = `${state.detail}${permission.epoch > 1 ? ` Permission has been revoked ${permission.epoch - 1}×.` : ""}`;
+}
 
 /** Records a person's judgement of a live decision, then reloads the ledger. */
 async function labelLive(decisionId, label) {

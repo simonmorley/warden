@@ -961,3 +961,124 @@ details#try-advanced summary {
 details#try-advanced[open] summary {
   margin-bottom: 0.5rem;
 }
+
+/* What the live system is allowed to do, on every page, colour-coded. */
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: help;
+}
+
+.live-status-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.live-status-mode {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.live-status-mode::before {
+  content: "●";
+  margin-right: 0.3rem;
+}
+
+.live-status-mode.SHADOW {
+  color: var(--shadow);
+}
+
+.live-status-mode.EARNING {
+  color: var(--earning);
+}
+
+.live-status-mode.AUTONOMOUS {
+  color: var(--autonomous);
+}
+
+/* A rehearsal, and it must be impossible to mistake for the real thing. */
+.sandbox {
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+/* The same ladder as the front page, lit as a run climbs it. */
+.ladder.live {
+  margin: 0.75rem 0;
+}
+
+.ladder.live .rung {
+  opacity: 0.45;
+}
+
+.ladder.live .rung.been {
+  opacity: 1;
+}
+
+.ladder.live .rung.here {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* The run as a story, so someone who looked away knows what they missed. */
+.story {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.story .beat {
+  font-size: 0.87rem;
+  color: var(--muted);
+  padding-left: 1.3rem;
+  position: relative;
+}
+
+.story .beat::before {
+  content: "○";
+  position: absolute;
+  left: 0;
+}
+
+.story .beat.done {
+  color: var(--ink);
+}
+
+.story .beat.done::before {
+  content: "✓";
+  color: var(--autonomous);
+}
+
+.story .beat.waiting::before {
+  content: "…";
+}
+
+/* Each change in the history: what moved, what it means, and the numbers behind it. */
+.transition {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.transition .arrow {
+  color: var(--muted);
+}
+
+.events .meaning {
+  display: block;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
