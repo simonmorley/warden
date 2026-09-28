@@ -38,6 +38,30 @@ function call(app: ReturnType<typeof createApp>, method: string, path: string, i
 }
 
 describe("authentication", () => {
+  // WARDEN_OPEN comes from .dev.vars, which only `wrangler dev` loads and no deploy ever
+  // does. So a local run needs no credential and a deployed one always does, with nothing
+  // for a person to paste anywhere.
+  it("needs no token when running locally, so a clone works straight after npm run dev", async () => {
+    const local = { ...testEnv, WARDEN_OPEN: "true" };
+    const res = await call(appWith(phishing), "POST", "/classify", { body: PHISH, token: null }, local);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("still accepts a token locally, so the CLI behaves the same either way", async () => {
+    const local = { ...testEnv, WARDEN_OPEN: "true" };
+    const res = await call(appWith(phishing), "POST", "/classify", { body: PHISH }, local);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a deployment that has neither a token nor local mode, rather than opening up", async () => {
+    const misconfigured = { ...env, WARDEN_TOKEN: "", WARDEN_OPEN: "" } as unknown as Env;
+    const res = await call(appWith(phishing), "POST", "/classify", { body: PHISH, token: null }, misconfigured);
+
+    expect(res.status).toBe(401);
+  });
+
   it.each([
     ["POST", "/classify"],
     ["POST", "/live/labels"],
