@@ -10,6 +10,20 @@ describe("HTTP surface", () => {
     expect(await res.text()).toContain("<title>Warden</title>");
   });
 
+  it("serves the dashboard under a strict Content-Security-Policy, since it displays attacker-written text", async () => {
+    const res = await SELF.fetch("https://warden.test/");
+    const csp = res.headers.get("content-security-policy") ?? "";
+
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("connect-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("base-uri 'none'");
+    expect(csp).not.toContain("unsafe-inline");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+
   it("answers an unknown path with a JSON 404, not an HTML page or a 500", async () => {
     const res = await SELF.fetch("https://warden.test/no-such-route");
 
