@@ -49,7 +49,7 @@ export function createApp(dependencies: Dependencies) {
 
       if (!matched) {
         const asset = await env.ASSETS.fetch(request);
-        if (asset.status !== 404) return asset;
+        if (asset.status !== 404) return withSecurityHeaders(asset);
         return problem(404, "not_found", `Nothing at ${request.method} ${pathname}`);
       }
 
@@ -172,6 +172,30 @@ async function openLive(env: Env, dependencies: Dependencies, scope: Scope) {
   const opened = await stub.open("live", scope);
   if (!opened.ok) throw new Error(`could not open the live ledger: ${opened.error}`);
   return { stub, epoch: opened.permission.epoch };
+}
+
+/**
+ * The dashboard displays attacker-written page text. It renders it as text, and this policy
+ * makes sure nothing that slips through could run: same-origin scripts, styles and
+ * connections only, nothing inline, no framing.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "connect-src 'self'",
+  "img-src 'self' data:",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+function withSecurityHeaders(asset: Response): Response {
+  const response = new Response(asset.body, asset);
+  response.headers.set("content-security-policy", CONTENT_SECURITY_POLICY);
+  response.headers.set("x-content-type-options", "nosniff");
+  response.headers.set("referrer-policy", "no-referrer");
+  return response;
 }
 
 function noModel(): Response {
