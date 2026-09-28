@@ -1,7 +1,7 @@
 import type { Fixture } from "./types";
 
 /** Variants generated per phishing seed, which with the seeds themselves fills the demo run. */
-export const VARIANTS_PER_SEED = 14;
+export const VARIANTS_PER_SEED = 21;
 
 /**
  * A short deterministic token from a seed id and an index. Pure: the set must be identical
