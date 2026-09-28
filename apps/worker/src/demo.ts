@@ -1,16 +1,11 @@
 import type { Label } from "@warden/engine";
-import type { Fixture } from "@warden/fixtures";
+import type { DemoStep, Fixture } from "@warden/fixtures";
 import { analyse } from "@warden/signals";
 import { classify, type Classification, type Model } from "./inference/classify";
 import type { LabelInput, LabelResult, Scope } from "./ledger";
 import { submissionFor, type LedgerPort } from "./pipeline";
 
-/** One page of a demo run, and how long its ground truth waits before being applied. */
-export interface DemoStep {
-  readonly fixture: Fixture;
-  /** Further steps to wait before labelling; 0 labels it straight after its own decision. */
-  readonly labelDelay: number;
-}
+export type { DemoStep };
 
 export interface PendingLabel {
   readonly decisionId: string;

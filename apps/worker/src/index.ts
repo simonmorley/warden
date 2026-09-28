@@ -1,3 +1,4 @@
+import { demoPlan } from "@warden/fixtures";
 import { createApp } from "./app";
 import { modelFor } from "./model";
 
@@ -10,6 +11,5 @@ export { Ledger } from "./ledger";
 export default createApp({
   model: modelFor,
   liveLedgerName: (scopeHash) => `live:${scopeHash}`,
-  // Filled from the fixture set once its labels have been confirmed by a person.
-  demoPlan: () => [],
+  demoPlan,
 }) satisfies ExportedHandler<Env>;

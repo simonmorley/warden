@@ -53,18 +53,19 @@ describe("Ledger: demo runs", () => {
     expect(await stub.startRun(PLAN)).toEqual({ ok: false, error: "not_a_demo_ledger" });
   });
 
-  it("fails a run with its reason, rather than stalling, when no model is configured", async () => {
+  it("fails a run with its reason, rather than stalling, when it cannot classify", async () => {
     const stub = demoLedger();
+    // Scoped to a model the Worker isn't configured with, so the run can't honour its scope.
     await stub.open("demo", SCOPE);
     await stub.startRun(PLAN);
 
     await runDurableObjectAlarm(stub);
 
-    expect((await stub.state())!.run).toEqual({
+    expect((await stub.state())!.run).toMatchObject({
       status: "failed",
       next: 0,
       total: 3,
-      reason: expect.stringContaining("no model"),
+      reason: expect.stringContaining(SCOPE.modelId),
     });
   });
 });

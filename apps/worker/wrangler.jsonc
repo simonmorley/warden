@@ -19,6 +19,12 @@
     "bindings": [{ "name": "LEDGER", "class_name": "Ledger" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Ledger"] }],
+  // The classifier. Chosen on false positives across the fixture set's traps and hard
+  // negatives — see docs/decision-log.md.
+  "ai": { "binding": "AI" },
+  "vars": {
+    "MODEL_ID": "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+  },
   "observability": {
     "enabled": true
   }
