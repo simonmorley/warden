@@ -83,11 +83,32 @@ describe("Ledger: decisions", () => {
         id: result.decisionId,
         url: "https://login.bank-1.example/",
         verdict: "phishing",
+        valid: true,
+        rejection: null,
+        citedSignals: ["S1"],
+        confidence: 0.9,
         counted: true,
         route: { to: "human", reason: "shadow" },
+        block: null,
         label: null,
+        createdAt: expect.any(Number),
       },
     ]);
+  });
+
+  it("shows what happened to each decision's block: active until it is reversed", async () => {
+    const stub = ledger();
+    await stub.open("demo", SCOPE);
+    await earnAutonomy(stub);
+    const kept = await submitted(stub, phishing(100));
+    const undone = await submitted(stub, phishing(101));
+    await stub.label({ decisionId: undone.decisionId, label: "wrong", source: "ground_truth", labelledBy: "fixture" });
+
+    const decisions = (await stub.state())!.decisions;
+    const blockOf = (id: string) => decisions.find((decision) => decision.id === id)?.block;
+
+    expect(blockOf(kept.decisionId)).toBe("active");
+    expect(blockOf(undone.decisionId)).toBe("reversed");
   });
 
   it("refuses a verdict produced under a different scope: it belongs to a different permission", async () => {
