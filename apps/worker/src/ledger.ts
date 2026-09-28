@@ -433,7 +433,7 @@ export class Ledger extends DurableObject<Env> {
 }
 
 /** The same scope always serialises to the same string, whatever order its keys arrived in. */
-function canonicalScope(scope: Scope): string {
+export function canonicalScope(scope: Scope): string {
   const { abuseType, action, modelId, promptHash, policyHash } = scope;
   return JSON.stringify({ abuseType, action, modelId, promptHash, policyHash });
 }

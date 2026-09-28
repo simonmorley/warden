@@ -22,8 +22,11 @@ const phishing = answering({
   reasoning: "Posts a password to another site.",
 });
 
-// Each test gets its own live ledger, so their histories can't mix.
-const appWith = (model: Model | null) => createApp({ model: () => model, liveLedgerName: () => `live:${crypto.randomUUID()}` });
+// Each app gets its own live ledger, so tests' histories can't mix.
+const appWith = (model: Model | null) => {
+  const name = `live:${crypto.randomUUID()}`;
+  return createApp({ model: () => model, liveLedgerName: () => name });
+};
 const testEnv = { ...env, WARDEN_TOKEN: TOKEN };
 
 function call(app: ReturnType<typeof createApp>, method: string, path: string, init: { body?: unknown; token?: string | null } = {}, bindings = testEnv) {

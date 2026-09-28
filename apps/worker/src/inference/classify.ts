@@ -1,5 +1,6 @@
 import type { Verdict } from "@warden/engine";
 import type { Analysis } from "@warden/signals";
+import { sha256Hex } from "../hash";
 
 /** The one thing the adapter needs from a model: messages in, a response out. */
 export interface Model {
@@ -83,9 +84,7 @@ export function buildRequest(url: string, analysis: Analysis): ModelRequest {
  * scoped to it, so an edited prompt can't carry the old one's track record.
  */
 export async function promptVersion(): Promise<string> {
-  const text = `${SYSTEM_PROMPT}\n${JSON.stringify(VERDICT_SCHEMA)}\n<untrusted_page>`;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(`${SYSTEM_PROMPT}\n${JSON.stringify(VERDICT_SCHEMA)}\n<untrusted_page>`);
 }
 
 /**
