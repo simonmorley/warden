@@ -88,7 +88,7 @@ describe("authentication", () => {
 describe("malformed requests get a useful 4xx, never a 500", () => {
   it.each([
     ["a body that isn't JSON", "{not json"],
-    ["a missing html field", { url: PHISH.url }],
+    ["an html field that isn't a string", { url: PHISH.url, html: 42 }],
     ["a URL that isn't http(s)", { url: "javascript:alert(1)", html: "<p>hi</p>" }],
     ["a relative URL", { url: "/login", html: "<p>hi</p>" }],
   ])("rejects %s with 400", async (_what, body) => {

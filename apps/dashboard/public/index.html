@@ -96,21 +96,23 @@
           <h2 id="try-title">Send Warden a page</h2>
         </div>
         <p class="note">
-          <b>Warden never visits the URL.</b> It judges the page source you give it, and the URL only for what it
-          says — the host, the path, anything hidden in the query. That is deliberate: it keeps every run repeatable,
-          and it keeps a live phishing site from being fetched by the thing meant to judge it.
+          Give it a URL and it will fetch the page and judge it. Or load one of the test pages, or paste source
+          yourself — Warden reads the source either way, so anything you paste is what gets judged.
         </p>
         <form id="try-form" class="try">
-          <label for="try-pick">Load a test page</label>
-          <select id="try-pick">
-            <option value="">Choose one…</option>
-          </select>
-          <label for="try-url">Reported URL</label>
-          <input id="try-url" type="url" required placeholder="https://login.northwind-bank.example/verify" />
-          <label for="try-html">Page source <span class="muted">— what Warden actually reads</span></label>
-          <textarea id="try-html" required rows="6" spellcheck="false" placeholder="Paste the page's HTML here, or load a test page above."></textarea>
-          <p id="try-mismatch" class="mismatch" hidden></p>
-          <button type="submit">Classify this page</button>
+          <label for="try-url">URL to check</label>
+          <input id="try-url" type="url" required placeholder="https://example.com/login" />
+          <details id="try-advanced">
+            <summary>Use a test page, or paste the source yourself</summary>
+            <label for="try-pick">Load a test page</label>
+            <select id="try-pick">
+              <option value="">Choose one…</option>
+            </select>
+            <label for="try-html">Page source <span class="muted">— leave empty and Warden fetches it</span></label>
+            <textarea id="try-html" rows="6" spellcheck="false" placeholder="Leave this empty to fetch the URL above."></textarea>
+            <p id="try-mismatch" class="mismatch" hidden></p>
+          </details>
+          <button type="submit">Classify</button>
         </form>
         <div id="try-result"></div>
       </section>

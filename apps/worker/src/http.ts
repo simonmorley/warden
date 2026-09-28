@@ -5,8 +5,14 @@ export function json(body: unknown, status = 200, headers: Record<string, string
   return Response.json(body, { status, headers });
 }
 
-export function problem(status: number, error: string, message: string, headers: Record<string, string> = {}): Response {
-  return json({ error, message }, status, headers);
+export function problem(
+  status: number,
+  error: string,
+  message: string,
+  headers: Record<string, string> = {},
+  detail: Record<string, unknown> = {},
+): Response {
+  return json({ error, message, ...detail }, status, headers);
 }
 
 /**

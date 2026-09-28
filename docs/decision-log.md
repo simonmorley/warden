@@ -6,6 +6,22 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — Warden fetches a reported URL
+
+**Changed.** `POST /classify` takes a URL on its own and fetches the page. Supplying the source still works and skips the fetch.
+
+**Why.** The design ruled out live fetching, for reproducibility and to keep live phishing out of the build. That reasoning holds for the demo corpus, which is unchanged and still fixed. It does not hold for someone trying one page themselves: nobody triaging abuse has a page's HTML, they have a URL, and requiring source made the thing a lab instrument.
+
+**What the guards are, since the URL comes from whoever reported it.** HTTPS only. No credentials in the URL, which would otherwise be sent to whatever it resolved to. Nothing aimed at loopback, a private range, link-local metadata, or a name that resolves inside — checked again at every redirect hop rather than only the first, since a public URL can redirect inwards. At most three hops. Non-HTML refused rather than read as markup. The body read up to a cap instead of whole. Failures named, so a caller is told what happened instead of handed an empty page.
+
+**What it doesn't do.** A plain fetch sees the HTML as served: no scripts run, and a kit that serves benign content to datacentre addresses shows it something harmless. Browser Rendering answers both and is the obvious next step; it is not built here.
+
+**Raised by.** Simon submitted his own URL, got a verdict about a test page whose source was still in the box, and asked whether the HTML was really needed.
+
+**Docs.** PRD §9 and §13; technical design §3F.
+
+---
+
 ## 2026-09-28 — A reset, for the demonstration rather than the mechanism
 
 **Changed.** `POST /live/reset` empties the live record. The technical design had removed reset entirely, on the grounds that a demo run is a fresh ledger and a real record is meant to be permanent.

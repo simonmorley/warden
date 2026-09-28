@@ -6,6 +6,7 @@ import type { DemoStep } from "./demo";
 import type { Model } from "./inference/classify";
 import type { Scope } from "./ledger";
 import { decide, type LedgerPort } from "./pipeline";
+import { fetchSnapshot } from "./snapshot";
 import { currentScope, scopeHash } from "./scope";
 
 export interface Dependencies {
@@ -15,6 +16,8 @@ export interface Dependencies {
   liveLedgerName(scopeHash: string): string;
   /** The pages a demo run walks through, in order. */
   demoPlan(): readonly DemoStep[];
+  /** How a reported page is fetched when no source is given. Injected so tests never leave the machine. */
+  fetcher?: typeof fetch;
 }
 
 interface Handler {
@@ -82,11 +85,24 @@ async function classifyPage(request: Request, env: Env, dependencies: Dependenci
   if (!model) return noModel();
 
   const body = await readObject(request);
-  const page = { url: requireString(body, "url", MAX_URL), html: requireString(body, "html", MAX_HTML) };
+  const url = requireString(body, "url", MAX_URL);
   try {
-    pageIdentity(page.url);
+    pageIdentity(url);
   } catch (error) {
     throw new BadRequest(error instanceof Error ? error.message : "The url must be an absolute http(s) URL.");
+  }
+
+  // A reporter has a URL, not the page's source. Given only a URL, fetch it.
+  const supplied = body["html"] === undefined ? null : requireString(body, "html", MAX_HTML);
+  let fetched = false;
+  let page = { url, html: supplied ?? "" };
+  if (supplied === null) {
+    const snapshot = await fetchSnapshot(url, dependencies.fetcher ? { fetcher: dependencies.fetcher } : {});
+    if (!snapshot.ok) {
+      return problem(502, "fetch_failed", `Warden could not read that page: ${snapshot.reason}.`, {}, { reason: snapshot.reason });
+    }
+    fetched = true;
+    page = { url: snapshot.finalUrl, html: snapshot.html };
   }
 
   const scope = await currentScope(model.id);
@@ -96,6 +112,7 @@ async function classifyPage(request: Request, env: Env, dependencies: Dependenci
   if (!submission.ok) throw new Error(`the live ledger refused a submission: ${submission.error}`);
 
   return json({
+    fetched,
     decisionId: submission.decisionId,
     route: submission.route,
     counted: submission.counted,

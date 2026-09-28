@@ -755,6 +755,7 @@ $("try-pick").addEventListener("change", async (event) => {
   $("try-url").value = res.data.url;
   $("try-html").value = res.data.html;
   loadedPage = { url: res.data.url, html: res.data.html };
+  $("try-advanced").open = true;
   $("try-result").replaceChildren();
   checkMismatch();
 });
@@ -764,12 +765,13 @@ $("try-pick").addEventListener("change", async (event) => {
  * source, so that combination silently produces a verdict about a completely different page.
  */
 function checkMismatch() {
-  const stale = loadedPage !== null && $("try-html").value === loadedPage.html && $("try-url").value !== loadedPage.url;
+  const stale =
+    loadedPage !== null && $("try-html").value.trim() !== "" && $("try-html").value === loadedPage.html && $("try-url").value !== loadedPage.url;
   const warning = $("try-mismatch");
   warning.hidden = !stale;
   if (stale) {
     warning.textContent =
-      "The page source below is still the test page you loaded, but the URL has changed. Warden reads the source, so it would judge the loaded page and label it with your URL. Paste the real source, or pick a test page again.";
+      "The source below is still the test page you loaded, but the URL has changed — so Warden would judge that page and record it under your URL. Clear the source to fetch the URL instead.";
   }
 }
 
@@ -800,6 +802,9 @@ function renderClassification(d) {
     el(
       "ol",
       { class: "pipeline" },
+      d.fetched
+        ? step("0", "Warden fetched the page", el("span", { class: "muted" }, "https only, redirects re-checked at every hop, nothing aimed at a private address"))
+        : step("0", "You supplied the page source", el("span", { class: "muted" }, "nothing was fetched")),
       step(
         "1",
         "Signals extracted from the page",
@@ -843,8 +848,11 @@ $("try-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const submit = event.submitter ?? $("try-form").querySelector("button");
   submit.disabled = true;
-  $("try-result").replaceChildren(el("p", { class: "empty" }, "Classifying — this is a live model call…"));
-  const res = await api("POST", "/classify", { url: $("try-url").value, html: $("try-html").value });
+  const html = $("try-html").value.trim();
+  $("try-result").replaceChildren(
+    el("p", { class: "empty" }, html === "" ? "Fetching the page, then classifying — this is a live model call…" : "Classifying — this is a live model call…"),
+  );
+  const res = await api("POST", "/classify", html === "" ? { url: $("try-url").value } : { url: $("try-url").value, html });
   submit.disabled = false;
 
   if (!res.ok) return $("try-result").replaceChildren(el("p", { class: "error" }, explain(res)));
