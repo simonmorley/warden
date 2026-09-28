@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @warden/worker",
+    "dev:host": "npm run dev -w @warden/worker -- --ip 0.0.0.0",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "check": "npm run typecheck && npm test",
