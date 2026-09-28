@@ -71,6 +71,7 @@ function formSignals(page: ParsedPage, pageHost: string, raise: Raise) {
   }
   if (page.inputs.some((input) => CARD_FIELD.test(describe(input)))) raise("card_fields", "asks for card details");
   if (page.inputs.some((input) => OTP_FIELD.test(describe(input)))) raise("otp_field", "asks for a one-time code");
+  if (asksForSeedPhrase(page, describe)) raise("seed_phrase_request", "asks for a wallet recovery phrase");
 
   const offsite = new Set<string>();
   for (const form of page.forms) {
@@ -83,6 +84,21 @@ function formSignals(page: ParsedPage, pageHost: string, raise: Raise) {
     if (host !== null && siteOf(host) !== siteOf(pageHost)) offsite.add(host);
   }
   if (offsite.size > 0) raise("form_posts_offsite", `posts to ${[...offsite].join(", ")}`);
+}
+
+const SEED_WORD_FIELD = /\bword[\s_-]*\d{1,2}\b|mnemonic|seed|phrase/i;
+const SEED_PHRASE_TEXT = /recovery phrase|seed phrase|secret phrase|mnemonic|\b(?:12|24)[\s-]word/i;
+/** A recovery phrase is usually asked for as a grid of 12 or 24 single-word fields. */
+const SEED_GRID = 12;
+
+/**
+ * Whether the page asks for a wallet recovery phrase: the most valuable thing a crypto
+ * wallet lure can steal, since it hands over the wallet itself, not just an account.
+ */
+function asksForSeedPhrase(page: ParsedPage, describe: (input: Record<string, string>) => string): boolean {
+  const wordFields = page.inputs.filter((input) => SEED_WORD_FIELD.test(describe(input))).length;
+  if (wordFields >= SEED_GRID) return true;
+  return SEED_PHRASE_TEXT.test(`${page.title} ${page.text.join(" ")}`);
 }
 
 const OBFUSCATION: ReadonlyArray<[string, RegExp]> = [

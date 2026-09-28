@@ -8,6 +8,7 @@ export type SignalId =
   | "password_field"
   | "card_fields"
   | "otp_field"
+  | "seed_phrase_request"
   | "form_posts_offsite"
   | "form_without_action"
   | "obfuscated_script"

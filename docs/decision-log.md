@@ -6,6 +6,22 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — A signal for recovery-phrase requests, from a survey of live kits
+
+**Changed.** Signal extraction gains `seed_phrase_request`. It fires on a grid of 12 or more word fields, or on text asking for a recovery, seed or secret phrase.
+
+**Why.**
+- We ran our own extractor over 17 live phishing pages. The URLs came from the OpenPhish community feed, and the page copies were urlscan.io's stored captures, so no live site was contacted.
+- The breakdown:
+  - 5 imitated crypto wallets or exchanges; 4 imitated social networks; 2 each were ISP or webmail logins.
+  - 11 were on free hosting, and 6 submitted their form by script with no action.
+- A recovery phrase is the most valuable thing a wallet lure can steal, since it hands over the wallet itself. No signal named it.
+- It fires on 1 of the 3 wallet-onboarding captures. The other two ask for the phrase on a later page, which a single snapshot never sees. That is a limit of snapshot-based triage, not of this signal.
+
+**Raised by.** Claude Code, from the survey.
+
+**Docs.** None; the technical design lists signal kinds by example, not exhaustively.
+
 ## 2026-09-28 — SQL moves into a storage layer, and the schema into versioned migrations
 
 **Changed.**
