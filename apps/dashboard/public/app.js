@@ -952,10 +952,38 @@ function renderClassification(d) {
         " ",
         el("span", { class: "muted" }, (REASONS[d.route.reason] ?? [])[1] ?? "Warden blocked this URL on its own."),
       ),
-      step("5", "Recorded in the live ledger", "It now waits for a person to confirm the verdict. Only that moves the record."),
+      step(
+        "5",
+        "Waiting for your judgement",
+        "Nothing about Warden's record has changed yet. Confirming whether this verdict was right is the only thing that moves it.",
+      ),
+    ),
+    el(
+      "div",
+      { class: "next-step" },
+      el(
+        "button",
+        {
+          type: "button",
+          onclick: () => {
+            window.location.hash = "#review";
+            requestAnimationFrame(() => highlightNewest(d.decisionId));
+          },
+        },
+        "Judge this verdict →",
+      ),
+      el("span", { class: "muted" }, "under Review, where everything awaiting you is listed"),
     ),
     el("dl", {}, row("Page text the model saw", el("span", { class: "muted" }, excerpt))),
   );
+}
+
+/** Scrolls the just-classified decision into view under Review, so it isn't hunted for. */
+function highlightNewest(decisionId) {
+  const row = $("live").querySelector(`[data-decision="${CSS.escape(decisionId)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ block: "center", behavior: "smooth" });
+  row.classList.add("highlight");
 }
 
 /** Signal ids as chips, with any detail as a tooltip. */

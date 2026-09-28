@@ -1082,3 +1082,20 @@ details#try-advanced[open] summary {
   font-size: 0.85rem;
   margin-top: 0.15rem;
 }
+
+/* Classifying a page changes nothing until someone judges it, so say where that happens. */
+.next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.25rem 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
+}
+
+.next-step span {
+  font-size: 0.85rem;
+}
