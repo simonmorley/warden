@@ -1,3 +1,4 @@
+import { DEFAULT_POLICY } from "@warden/engine";
 import { pageIdentity } from "@warden/signals";
 import { authorised, BadRequest, json, problem, readObject, requireString } from "./http";
 import type { DemoStep } from "./demo";
@@ -113,7 +114,7 @@ async function readLive(_request: Request, env: Env, dependencies: Dependencies)
   const model = dependencies.model(env);
   if (!model) return noModel();
   const { stub } = await openLive(env, dependencies, await currentScope(model.id));
-  return json(await stub.state());
+  return json({ ...(await stub.state()), policy: DEFAULT_POLICY });
 }
 
 async function labelLive(request: Request, env: Env, dependencies: Dependencies): Promise<Response> {
@@ -163,7 +164,7 @@ async function watchDemoRun(
   if (!runId || !RUN_ID.test(runId)) return problem(404, "not_found", "There is no such demo run.");
   const state = await env.LEDGER.get(env.LEDGER.idFromName(`demo:${runId}`)).state();
   if (!state || state.kind !== "demo") return problem(404, "not_found", "There is no such demo run.");
-  return json(state);
+  return json({ ...state, policy: DEFAULT_POLICY });
 }
 
 async function openLive(env: Env, dependencies: Dependencies, scope: Scope) {
