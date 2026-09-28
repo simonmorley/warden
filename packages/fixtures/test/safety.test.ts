@@ -110,6 +110,18 @@ describe("checkFixture", () => {
     });
   });
 
+  describe("provenance is checked too", () => {
+    it("flags a live host named in a fixture's provenance", () => {
+      const provenance = { survey: "openphish-2026-09-28", technique: "clone of login.realbank.com" };
+      expect(kinds(clean({ provenance }))).toContain("live_url");
+    });
+
+    it("accepts provenance that names a survey and a technique", () => {
+      const provenance = { survey: "openphish-2026-09-28", technique: "credential harvest, form submitted by script" };
+      expect(checkFixture(clean({ provenance }))).toEqual([]);
+    });
+  });
+
   describe("every label is set by a person", () => {
     it.each([null, ""])("flags a label nobody has confirmed (%j)", (labelledBy) => {
       expect(kinds(clean({ labelledBy }))).toContain("unconfirmed_label");
