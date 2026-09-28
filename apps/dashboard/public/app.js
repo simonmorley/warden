@@ -861,45 +861,24 @@ function fillPicker() {
   picker.append(...corpus.techniques.map((page) => el("option", { value: page.id }, `${page.technique} — really ${page.truth}`)));
 }
 
-// Where the source in the box came from, so an edited URL with somebody else's HTML still
-// sitting underneath it can be caught before it produces a verdict about the wrong page.
-let loadedPage = null;
-
-$("try-pick").addEventListener("change", async (event) => {
+$("try-pick").addEventListener("change", (event) => {
   const chosen = corpus.techniques.find((page) => page.id === event.target.value);
   if (!chosen) return;
-  const res = await api("GET", `/corpus/pages/${encodeURIComponent(chosen.id)}`);
-  if (!res.ok) return showBanner(explain(res));
-  $("try-url").value = res.data.url;
-  $("try-html").value = res.data.html;
-  loadedPage = { url: res.data.url, html: res.data.html };
-  $("try-advanced").open = true;
+  // A real URL on this Worker, so Warden fetches it like any other page rather than being
+  // handed source. Served as plain text, so nothing renders a page that imitates phishing.
+  $("try-url").value = new URL(`/corpus/pages/${encodeURIComponent(chosen.id)}/source`, window.location.origin).toString();
+  $("try-html").value = "";
   $("try-result").replaceChildren();
-  checkMismatch();
+  $("try-mismatch").hidden = true;
 });
 
-/**
- * Warns when the URL has been changed but the loaded page source has not. Warden judges the
- * source, so that combination silently produces a verdict about a completely different page.
- */
-function checkMismatch() {
-  const stale =
-    loadedPage !== null && $("try-html").value.trim() !== "" && $("try-html").value === loadedPage.html && $("try-url").value !== loadedPage.url;
-  const warning = $("try-mismatch");
-  warning.hidden = !stale;
-  if (stale) {
-    warning.textContent =
-      "The source below is still the test page you loaded, but the URL has changed — so Warden would judge that page and record it under your URL. Clear the source to fetch the URL instead.";
-  }
-}
-
-$("try-url").addEventListener("input", () => {
-  $("try-pick").value = "";
-  checkMismatch();
-});
 $("try-html").addEventListener("input", () => {
-  loadedPage = null;
-  checkMismatch();
+  const pasted = $("try-html").value.trim() !== "";
+  $("try-mismatch").hidden = !pasted;
+  if (pasted) {
+    $("try-mismatch").textContent =
+      "Warden will judge the source below and record it under the URL above, without fetching anything. Clear it to fetch the URL instead.";
+  }
 });
 
 /** A definition-list row. */

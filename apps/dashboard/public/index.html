@@ -100,20 +100,24 @@
           <h2 id="try-title">Send Warden a page</h2>
         </div>
         <p class="note">
-          Give it a URL and it will fetch the page and judge it. Or load one of the test pages, or paste source
-          yourself — Warden reads the source either way, so anything you paste is what gets judged.
+          Give Warden a URL and it fetches the page and judges it. Any real site works — try your own.
         </p>
         <form id="try-form" class="try">
           <label for="try-url">URL to check</label>
           <input id="try-url" type="url" required placeholder="https://example.com/login" />
+          <label for="try-pick">…or use one of the example pages</label>
+          <select id="try-pick">
+            <option value="">Choose one, and its URL fills in above…</option>
+          </select>
+          <p class="hint">
+            The example pages are served from this Worker at real URLs, so Warden fetches them exactly as it would
+            anything else. They're written for this project — no live phishing URL is shipped here. Real ones die
+            within hours, and the kits serve something harmless to anything that looks like a datacentre.
+          </p>
           <details id="try-advanced">
-            <summary>Use a test page, or paste the source yourself</summary>
-            <label for="try-pick">Load a test page</label>
-            <select id="try-pick">
-              <option value="">Choose one…</option>
-            </select>
-            <label for="try-html">Page source <span class="muted">— leave empty and Warden fetches it</span></label>
-            <textarea id="try-html" rows="6" spellcheck="false" placeholder="Leave this empty to fetch the URL above."></textarea>
+            <summary>Paste page source instead</summary>
+            <label for="try-html">Page source <span class="muted">— leave empty and Warden fetches the URL</span></label>
+            <textarea id="try-html" rows="6" spellcheck="false" placeholder="Leave empty to fetch the URL above."></textarea>
             <p id="try-mismatch" class="mismatch" hidden></p>
           </details>
           <button type="submit">Classify</button>

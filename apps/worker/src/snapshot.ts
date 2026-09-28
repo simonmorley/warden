@@ -22,12 +22,16 @@ export type SnapshotResult =
  */
 export async function fetchSnapshot(
   url: string,
-  { fetcher = fetch, timeoutMs = TIMEOUT_MS }: { fetcher?: typeof fetch; timeoutMs?: number } = {},
+  {
+    fetcher = fetch,
+    timeoutMs = TIMEOUT_MS,
+    selfOrigin,
+  }: { fetcher?: typeof fetch; timeoutMs?: number; selfOrigin?: string } = {},
 ): Promise<SnapshotResult> {
   let target = url;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const checked = publicHttpsUrl(target);
+    const checked = allowedUrl(target, selfOrigin);
     if (!checked.ok) return checked;
 
     let response: Response;
@@ -55,6 +59,27 @@ export async function fetchSnapshot(
     return { ok: true, html: await readBounded(response), finalUrl: checked.url };
   }
   return { ok: false, reason: "too_many_redirects" };
+}
+
+/**
+ * Accepts an https URL naming somewhere on the public internet, or this Worker's own origin.
+ *
+ * The exception is narrow and deliberate: the example pages are served by this Worker, and
+ * run locally that means plain http on loopback, which the guard is otherwise right to
+ * refuse. It is one exact origin, so nothing else on the same machine is reachable.
+ */
+function allowedUrl(candidate: string, selfOrigin?: string): { ok: true; url: string } | { ok: false; reason: string } {
+  if (selfOrigin) {
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.origin === selfOrigin && !parsed.username && !parsed.password) {
+        return { ok: true, url: parsed.toString() };
+      }
+    } catch {
+      return { ok: false, reason: "unsupported_url" };
+    }
+  }
+  return publicHttpsUrl(candidate);
 }
 
 /** Accepts only an https URL that names somewhere on the public internet. */

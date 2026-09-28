@@ -41,6 +41,7 @@ const ROUTES: readonly Route[] = [
   { pattern: /^\/live\/reset$/, handlers: { POST: { auth: true, run: resetLive } } },
   { pattern: /^\/corpus$/, handlers: { GET: { auth: false, run: readCorpus } } },
   { pattern: /^\/corpus\/pages\/([^/]+)$/, handlers: { GET: { auth: false, run: readCorpusPage } } },
+  { pattern: /^\/corpus\/pages\/([^/]+)\/source$/, handlers: { GET: { auth: false, run: serveCorpusPage } } },
   { pattern: /^\/demo\/runs$/, handlers: { POST: { auth: true, run: startDemoRun } } },
   { pattern: /^\/demo\/runs\/([^/]+)$/, handlers: { GET: { auth: false, run: watchDemoRun } } },
 ];
@@ -97,7 +98,10 @@ async function classifyPage(request: Request, env: Env, dependencies: Dependenci
   let fetched = false;
   let page = { url, html: supplied ?? "" };
   if (supplied === null) {
-    const snapshot = await fetchSnapshot(url, dependencies.fetcher ? { fetcher: dependencies.fetcher } : {});
+    const snapshot = await fetchSnapshot(url, {
+      ...(dependencies.fetcher ? { fetcher: dependencies.fetcher } : {}),
+      selfOrigin: new URL(request.url).origin,
+    });
     if (!snapshot.ok) {
       return problem(502, "fetch_failed", `Warden could not read that page: ${snapshot.reason}.`, {}, { reason: snapshot.reason });
     }
@@ -208,6 +212,30 @@ async function readCorpusPage(
     truth: page.truth,
     category: page.category,
     technique: page.provenance?.technique ?? page.category,
+  });
+}
+
+/**
+ * An example page at a real URL, so "try one" can mean a URL rather than pasted source.
+ *
+ * Served as plain text, never as HTML: these pages imitate phishing, and the fixture safety
+ * rules say no browser should ever render one. Warden's fetcher accepts text/plain, so it
+ * reads them exactly as it would any other page.
+ */
+async function serveCorpusPage(
+  _request: Request,
+  _env: Env,
+  _dependencies: Dependencies,
+  [id]: readonly string[],
+): Promise<Response> {
+  const page = ALL_FIXTURES.find((fixture) => fixture.id === id);
+  if (!page) return problem(404, "not_found", "There is no such test page.");
+  return new Response(page.html, {
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "x-content-type-options": "nosniff",
+      "content-disposition": "inline",
+    },
   });
 }
 

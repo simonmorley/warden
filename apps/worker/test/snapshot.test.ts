@@ -43,7 +43,9 @@ describe("fetchSnapshot", () => {
   });
 
   it("allows only that origin, not anything else on the same machine", async () => {
-    const result = await fetchSnapshot("http://localhost:9999/admin", {
+    // https, so this can only fail on the host check — proving the exception is the origin
+    // and not a general amnesty for localhost.
+    const result = await fetchSnapshot("https://localhost:9999/admin", {
       fetcher: serving(PAGE),
       selfOrigin: "http://localhost:8788",
     });
