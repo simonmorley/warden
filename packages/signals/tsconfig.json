@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Pure like the engine: a snapshot goes in, signals come out, and nothing can reach out.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src"]
+}

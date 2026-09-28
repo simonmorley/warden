@@ -1,0 +1,17 @@
+{
+  "name": "@warden/signals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Signal extraction: a pure function from a page snapshot to the signals a verdict may cite.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "htmlparser2": "^12.0.0"
+  }
+}
