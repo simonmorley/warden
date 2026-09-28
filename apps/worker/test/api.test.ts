@@ -164,6 +164,8 @@ describe("GET /live", () => {
       kind: "live",
       scope: { abuseType: "phishing", action: "block_url", modelId: "@cf/test/model" },
       permission: { state: "SHADOW", epoch: 1 },
+      // The rules in force, so anyone reading this can recompute the bound for themselves.
+      policy: { requiredScore: 0.95, z: 1.96, probationLength: 10, maxUnreviewed: 3 },
     });
     expect(state["decisions"]).toHaveLength(1);
   });
