@@ -87,11 +87,17 @@ section {
   min-width: 0;
 }
 
+/* A heading on the left and its controls on the right. Controls go in one .actions wrapper:
+   a third child here would be spread into the middle of the row by space-between. */
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.section-head > .actions {
+  flex-shrink: 0;
 }
 
 h2 {

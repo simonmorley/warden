@@ -831,8 +831,6 @@ async function labelLive(decisionId, label) {
   await loadLive();
 }
 
-$("refresh-live").addEventListener("click", loadLive);
-
 // Each demo run already gets its own ledger, so running again is the reset. Clearing only
 // stops showing the old one, and costs nothing.
 $("clear-demo").addEventListener("click", () => {
