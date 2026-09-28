@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development; it is gitignored.
+# The bearer token for endpoints that change state or spend inference.
+# In production: npx wrangler secret put WARDEN_TOKEN
+WARDEN_TOKEN=change-me
