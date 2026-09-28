@@ -44,10 +44,5 @@ export interface Analysis {
   readonly excerpt: string;
 }
 
-export function pageIdentity(_url: string): string {
-  throw new Error("not implemented");
-}
-
-export function analyse(_snapshot: Snapshot): Analysis {
-  throw new Error("not implemented");
-}
+export { analyse } from "./analyse";
+export { FREE_HOSTING, pageIdentity } from "./url";
