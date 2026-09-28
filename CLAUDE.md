@@ -29,6 +29,12 @@ Warden is phishing triage where an AI classifier has to earn, and can lose, perm
 ## Code quality
 
 - Readable over clever. Names come from the domain: verdict, ledger, epoch, bar, probation.
+- **Guard clauses and early returns.** No nested `if`s, and no `else`: handle the exception case first and return, so the main path stays flat. When a branch grows, extract a function.
+- **No SQL outside `apps/worker/src/storage/`.**
+  - Schema changes are new, append-only migrations. Never edit one that has shipped.
+  - Queries are named, parameterised statements in the store, each with a comment saying what it's for.
+  - The Durable Object never builds SQL.
+- **Every function has a short doc comment:** what it does, and anything a caller must know. One to three lines, TSDoc style, so developer docs can be generated from them.
 - Handle errors where they occur and return a useful message. Malformed input gets a 4xx, never a 500.
 - Comments and commit messages explain *why*. The code already says what.
 - Keep commits small, with conventional prefixes: `test:`, `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`.
