@@ -7,6 +7,29 @@ const model: Model = { id: "@cf/test/model", complete: async () => "{}" };
 const app = createApp({ model: () => model, liveLedgerName: () => "live:corpus", demoPlan: () => [] });
 const get = (path: string) => app.fetch(new Request(`https://warden.test${path}`), env);
 
+describe("GET /corpus/pages/:id/source", () => {
+  it("serves a test page at a real URL, so it can be fetched like any other", async () => {
+    const { techniques } = await (await get("/corpus")).json<{ techniques: { id: string }[] }>();
+    const res = await get(`/corpus/pages/${techniques[0]!.id}/source`);
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("<");
+  });
+
+  it("serves it as plain text, so no browser ever renders a page that imitates phishing", async () => {
+    const { techniques } = await (await get("/corpus")).json<{ techniques: { id: string }[] }>();
+    const res = await get(`/corpus/pages/${techniques[0]!.id}/source`);
+
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    expect(res.headers.get("content-type")).not.toContain("text/html");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("returns 404 for a page it doesn't have", async () => {
+    expect((await get("/corpus/pages/nope/source")).status).toBe(404);
+  });
+});
+
 describe("GET /corpus/pages/:id", () => {
   it("hands back one page's source, so the picker can load it without anyone writing HTML", async () => {
     const { techniques } = await (await get("/corpus")).json<{ techniques: { id: string }[] }>();
