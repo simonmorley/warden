@@ -4,9 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Warden</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <h1>Warden</h1>
-    <p>Phishing triage where the AI has to earn the right to act.</p>
+    <header class="masthead">
+      <div class="brand">
+        <h1>Warden</h1>
+        <p>Phishing triage where the AI has to earn the right to act.</p>
+      </div>
+      <form id="token-form" class="token" autocomplete="off">
+        <label for="token">Access token</label>
+        <div class="inline">
+          <input id="token" type="password" placeholder="Needed to run, classify or label" spellcheck="false" />
+          <button type="submit">Use</button>
+        </div>
+        <p id="token-state" class="hint">Viewing is open; anything that spends inference or changes state needs the token.</p>
+      </form>
+    </header>
+
+    <p id="banner" class="banner" role="status" hidden></p>
+
+    <main>
+      <section aria-labelledby="demo-title">
+        <div class="section-head">
+          <h2 id="demo-title">Demo run</h2>
+          <button id="run-demo" type="button">Run the demo</button>
+        </div>
+        <p class="note">
+          Every verdict is a live Workers AI call. Labels stand in for an analyst: each comes from the page's hand-set
+          ground truth, and says whether the model's verdict was right. Each run gets a fresh ledger.
+        </p>
+        <div id="demo" class="ledger" aria-live="polite"><p class="empty">No run yet.</p></div>
+      </section>
+
+      <section aria-labelledby="live-title">
+        <div class="section-head">
+          <h2 id="live-title">Live ledger</h2>
+          <button id="refresh-live" type="button" class="secondary">Refresh</button>
+        </div>
+        <p class="note">The permanent ledger for the current model, prompt and policy. Only a person's label counts here.</p>
+        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
+      </section>
+
+      <section aria-labelledby="try-title">
+        <h2 id="try-title">Try it live</h2>
+        <p class="note">
+          Paste a page snapshot. It is classified on the spot, and joins the live ledger's queue for a person to label.
+          The page is only ever shown here as text.
+        </p>
+        <form id="try-form" class="try">
+          <label for="try-url">Reported URL</label>
+          <input id="try-url" type="url" required placeholder="https://login.northwind-bank.example/verify" />
+          <label for="try-html">Page HTML</label>
+          <textarea id="try-html" required rows="8" spellcheck="false" placeholder="<html>…</html>"></textarea>
+          <button type="submit">Classify</button>
+        </form>
+        <div id="try-result"></div>
+      </section>
+    </main>
+
+    <footer>A proof of concept on Cloudflare Workers. The design and its decision log are in the repository's docs folder.</footer>
   </body>
 </html>
