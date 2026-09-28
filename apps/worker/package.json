@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@warden/engine": "*",
-    "@warden/signals": "*"
+    "@warden/signals": "*",
+    "@warden/fixtures": "*"
   }
 }
