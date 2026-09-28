@@ -106,6 +106,59 @@ describe("malformed requests get a useful 4xx, never a 500", () => {
   });
 });
 
+describe("POST /classify: from a URL alone", () => {
+  const serving = (html: string) =>
+    (async () => new Response(html, { status: 200, headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+
+  it("fetches the page when no source is given, because a reporter has a URL and not HTML", async () => {
+    const app = createApp({
+      model: () => phishing,
+      liveLedgerName: () => `live:${crypto.randomUUID()}`,
+      demoPlan: () => [],
+      fetcher: serving('<form action="https://collect.northwind.invalid/s"><input type="password"></form>'),
+    });
+
+    const res = await call(app, "POST", "/classify", { body: { url: PHISH.url } });
+    const decision = await res.json<Record<string, unknown>>();
+
+    expect(res.status).toBe(200);
+    expect(decision).toMatchObject({ verdict: "phishing", fetched: true });
+    expect(decision["signals"]).toEqual(expect.arrayContaining([expect.objectContaining({ id: "form_posts_offsite" })]));
+  });
+
+  it("explains a page it could not fetch, rather than classifying nothing", async () => {
+    const app = createApp({
+      model: () => phishing,
+      liveLedgerName: () => `live:${crypto.randomUUID()}`,
+      demoPlan: () => [],
+      fetcher: (async () => {
+        throw new Error("no route");
+      }) as unknown as typeof fetch,
+    });
+
+    const res = await call(app, "POST", "/classify", { body: { url: PHISH.url } });
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: "fetch_failed", reason: "unreachable" });
+  });
+
+  it("uses the source it is given without fetching anything", async () => {
+    const app = createApp({
+      model: () => phishing,
+      liveLedgerName: () => `live:${crypto.randomUUID()}`,
+      demoPlan: () => [],
+      fetcher: (async () => {
+        throw new Error("should not be called");
+      }) as unknown as typeof fetch,
+    });
+
+    const res = await call(app, "POST", "/classify", { body: PHISH });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ fetched: false });
+  });
+});
+
 describe("POST /classify: try it live", () => {
   it("classifies a pasted snapshot and records it in the live ledger for a human", async () => {
     const app = appWith(phishing);
