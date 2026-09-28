@@ -59,3 +59,48 @@ export interface Authorisation {
   /** The permission after this decision: a block reserves a cap slot. */
   readonly permission: Permission;
 }
+
+/** A trusted label says whether the verdict was right. Nothing else moves the track record. */
+export type Label = "right" | "wrong";
+
+/** What the engine needs to know about the decision a label is for. */
+export interface LabelledDecision {
+  /** Whether the verdict was eligible when it was decided (`Authorisation.counts`). */
+  readonly counted: boolean;
+  /** The epoch the ledger was in when it decided; a block is authorised in the same one. */
+  readonly epoch: number;
+  /** The verdict became an automatic block, still unreviewed, since labels are applied once. */
+  readonly blocked: boolean;
+}
+
+/** The numbers an event was decided on, so anyone can recompute it. */
+export interface Tally {
+  readonly epoch: number;
+  readonly right: number;
+  readonly wrong: number;
+  readonly bound: number | null;
+}
+
+export type EngineEvent =
+  | {
+      readonly kind: "promoted";
+      readonly from: "SHADOW" | "EARNING";
+      readonly to: "EARNING" | "AUTONOMOUS";
+      readonly tally: Tally;
+    }
+  | {
+      readonly kind: "demoted";
+      readonly from: "EARNING" | "AUTONOMOUS";
+      readonly to: "SHADOW";
+      readonly tally: Tally;
+    }
+  | { readonly kind: "probation_restarted"; readonly tally: Tally }
+  | { readonly kind: "revoked"; readonly nextEpoch: number; readonly tally: Tally }
+  | { readonly kind: "reversed"; readonly blockEpoch: number };
+
+export interface LabelOutcome {
+  readonly permission: Permission;
+  /** Undo the decision's block: it was automatic and it was wrong. */
+  readonly reverse: boolean;
+  readonly events: readonly EngineEvent[];
+}
