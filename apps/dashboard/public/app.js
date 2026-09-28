@@ -647,6 +647,8 @@ async function watchDemo(runId) {
   renderLedger($("demo"), res.data);
   const running = res.data.run?.status === "running";
   $("run-demo").disabled = running;
+  $("run-demo").textContent = running ? "Running…" : res.data.run ? "Run it again" : "Run the demo";
+  $("clear-demo").hidden = running || !res.data.run;
   if (running) demoTimer = setTimeout(() => watchDemo(runId), 1500);
 }
 
@@ -705,6 +707,27 @@ async function labelLive(decisionId, label) {
 }
 
 $("refresh-live").addEventListener("click", loadLive);
+
+// Each demo run already gets its own ledger, so running again is the reset. Clearing only
+// stops showing the old one, and costs nothing.
+$("clear-demo").addEventListener("click", () => {
+  store(RUN_KEY, "");
+  lastDemoState = null;
+  clearTimeout(demoTimer);
+  $("demo").replaceChildren(el("p", { class: "empty" }, "No run yet."));
+  $("clear-demo").hidden = true;
+  $("run-demo").textContent = "Run the demo";
+});
+
+$("reset-live").addEventListener("click", async () => {
+  const waiting = lastLiveState?.decisions.length ?? 0;
+  if (waiting > 0 && !confirm(`Delete this record? ${waiting} decision${waiting === 1 ? "" : "s"} and everything Warden has earned here will be gone.`)) {
+    return;
+  }
+  const res = await api("POST", "/live/reset");
+  showBanner(res.ok ? "" : explain(res));
+  await loadLive();
+});
 
 // Sending Warden a page.
 

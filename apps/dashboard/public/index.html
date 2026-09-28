@@ -64,10 +64,31 @@
           </div>
         </div>
 
-        <p class="note">
-          <b>Send a page</b> puts one through and shows every step. <b>Review</b> is where you confirm verdicts.
-          <b>Demo run</b> plays the whole story out on pages whose answers are already known.
-        </p>
+        <h3 class="howto-title">How to use this</h3>
+        <ol class="howto">
+          <li>
+            <b>Demo run</b>
+            <span>
+              Start here. Two minutes, about 150 pages whose real answers are already known. Watch Warden earn the
+              right to act, use it, then lose it to a page that tricks it. Nothing is scripted — every verdict is a
+              live model call.
+            </span>
+          </li>
+          <li>
+            <b>Send a page</b>
+            <span>
+              Try one yourself. Pick a test page or paste your own, and see each step: what was extracted, what the
+              model said, whether its evidence held up, and what it was allowed to do.
+            </span>
+          </li>
+          <li>
+            <b>Review</b>
+            <span>
+              Say whether each verdict was right. This is the only thing that moves Warden's record — and only a
+              verdict of <em>phishing</em> counts, because being right that a page is harmless is easy.
+            </span>
+          </li>
+        </ol>
       </section>
 
       <section id="page-try" hidden aria-labelledby="try-title">
@@ -97,6 +118,7 @@
         <div class="section-head">
           <h2 id="review-title">Review</h2>
           <button id="refresh-live" type="button" class="secondary">Refresh</button>
+          <button id="reset-live" type="button" class="secondary">Start over</button>
         </div>
         <p class="note">
           Pages you send land here. Confirming a verdict is the only thing that moves Warden's record.
@@ -108,6 +130,7 @@
         <div class="section-head">
           <h2 id="demo-title">Watch it earn permission</h2>
           <button id="run-demo" type="button">Run the demo</button>
+          <button id="clear-demo" type="button" class="secondary" hidden>Clear</button>
         </div>
         <p class="note">
           The demo feeds Warden a set of pages whose real answer we already know, one after another, and confirms each

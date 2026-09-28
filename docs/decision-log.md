@@ -6,6 +6,20 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — A reset, for the demonstration rather than the mechanism
+
+**Changed.** `POST /live/reset` empties the live record. The technical design had removed reset entirely, on the grounds that a demo run is a fresh ledger and a real record is meant to be permanent.
+
+**Why.** That reasoning is right about the mechanism and wrong about a proof of concept people click around in. A record polluted by a few experiments had no way back, and the next person to open the page inherited the last one's leftovers. Nothing in the permission design depends on a record being un-resettable — an operator who can deploy the Worker can already wipe its storage.
+
+It is guarded like anything else that changes state, it asks before destroying anything, and the code says plainly that it exists for the demonstration and not the mechanism. Demo runs need no such thing: each run already gets its own ledger, so running again *is* the reset, and the button now says "Run it again" once one has finished.
+
+**Raised by.** Simon: "is there a way to reset the demo?"
+
+**Docs.** Technical design §3F.
+
+---
+
 ## 2026-09-28 — No credential in the browser, and no deployment by default
 
 **Changed.** Three things, from one question: how does a stranger who clones this repository actually run it?

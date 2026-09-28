@@ -876,3 +876,51 @@ button.tab.current {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+/* How to use this: three steps, in the order someone should take them. */
+.howto-title {
+  margin: 1.75rem 0 0.6rem;
+  font-size: 1rem;
+}
+
+.howto {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: howto;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.howto li {
+  counter-increment: howto;
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  gap: 0.15rem 0.6rem;
+  align-items: baseline;
+}
+
+.howto li::before {
+  content: counter(howto);
+  grid-row: span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.howto b {
+  font-size: 0.95rem;
+}
+
+.howto span {
+  grid-column: 2;
+  font-size: 0.88rem;
+  color: var(--muted);
+}

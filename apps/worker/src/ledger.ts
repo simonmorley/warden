@@ -170,6 +170,17 @@ export class Ledger extends DurableObject<Env> {
     }
   }
 
+  /**
+   * Empties this ledger completely: permission, decisions, blocks, history, everything.
+   *
+   * The mechanism has no need of this — a demo run is a fresh ledger, and a real record is
+   * meant to be permanent. It exists so a proof of concept can be shown twice without the
+   * second viewer inheriting the first one's experiments.
+   */
+  async reset(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+  }
+
   /** Everything the dashboard shows about this ledger, or null if it was never opened. */
   state(): LedgerState | null {
     const ledger = this.store.ledger();
