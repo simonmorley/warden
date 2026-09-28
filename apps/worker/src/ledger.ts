@@ -102,9 +102,17 @@ export interface DecisionSummary {
   readonly id: string;
   readonly url: string;
   readonly verdict: Verdict;
+  readonly valid: boolean;
+  readonly rejection: string | null;
+  readonly citedSignals: readonly string[];
+  /** As the model stated it: recorded for the audit trail, never used to decide anything. */
+  readonly confidence: number | null;
   readonly counted: boolean;
   readonly route: Route;
+  /** What became of the decision's block, if it made one. */
+  readonly block: "active" | "reversed" | null;
   readonly label: Label | null;
+  readonly createdAt: number;
 }
 
 export interface RunStatus {
@@ -438,18 +446,41 @@ export class Ledger extends DurableObject<Env> {
       .map((row) => ({ url: row.url, decisionId: row.decision_id, epoch: row.epoch, createdAt: row.created_at }));
 
     const decisions = this.sql
-      .exec<{ id: string; url: string; verdict: string; counted: number; route: string; label: string | null }>(
-        `SELECT d.id, d.url, d.verdict, d.counted, d.route, l.label FROM decisions d
-         LEFT JOIN labels l ON l.decision_id = d.id ORDER BY d.seq`,
+      .exec<{
+        id: string;
+        url: string;
+        verdict: string;
+        valid: number;
+        rejection: string | null;
+        cited_signals: string;
+        confidence: number | null;
+        counted: number;
+        route: string;
+        block: string | null;
+        label: string | null;
+        created_at: number;
+      }>(
+        `SELECT d.id, d.url, d.verdict, d.valid, d.rejection, d.cited_signals, d.confidence, d.counted,
+                d.route, a.status AS block, l.label, d.created_at
+         FROM decisions d
+         LEFT JOIN actions a ON a.decision_id = d.id
+         LEFT JOIN labels l ON l.decision_id = d.id
+         ORDER BY d.seq`,
       )
       .toArray()
       .map((row) => ({
         id: row.id,
         url: row.url,
         verdict: row.verdict as Verdict,
+        valid: row.valid === 1,
+        rejection: row.rejection,
+        citedSignals: JSON.parse(row.cited_signals) as string[],
+        confidence: row.confidence,
         counted: row.counted === 1,
         route: JSON.parse(row.route) as Route,
+        block: row.block as DecisionSummary["block"],
         label: row.label as Label | null,
+        createdAt: row.created_at,
       }));
 
     const events = this.sql
