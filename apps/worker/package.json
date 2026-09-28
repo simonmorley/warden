@@ -16,6 +16,7 @@
     "wrangler": "^4.143.0"
   },
   "dependencies": {
-    "@warden/engine": "*"
+    "@warden/engine": "*",
+    "@warden/signals": "*"
   }
 }
