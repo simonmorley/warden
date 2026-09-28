@@ -49,6 +49,18 @@ describe("authorise: which verdicts count", () => {
   });
 });
 
+describe("authorise: rejected responses", () => {
+  it.each(["phishing", "not_phishing", "uncertain"] as const)(
+    "reports a rejected response as rejected, whatever verdict it carries (%s)",
+    (verdict) => {
+      const result = authorise(autonomous(), submission({ verdict, valid: false }), DEFAULT_POLICY);
+
+      expect(result.route).toEqual({ to: "human", reason: "rejected" });
+      expect(result.counts).toBe(false);
+    },
+  );
+});
+
 describe("authorise: who may block", () => {
   it.each([
     ["SHADOW", "shadow"],
