@@ -221,18 +221,18 @@ function runText(run) {
 // is mostly campaign siblings: near-identical pages that nearly all go the same way.
 const views = new Map();
 
-/** Renders a ledger: run progress, summary tiles, events and the decision feed. */
-function renderLedger(container, state, { onLabel } = {}) {
+/** Renders a record: run progress, summary tiles, events and the decision feed. Read-only —
+ * judgements are given under Review, in one place rather than two. */
+function renderLedger(container, state) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
   const view = views.get(container.id) ?? (state.decisions.length > 20 ? "mattered" : "all");
   container.replaceChildren(
     ...(state.run ? [runProgress(state.run, state)] : []),
-    summaryTiles(state),
-    el("p", { class: "hint" }, "Proven accuracy is recomputed in your browser from the counts above, using the server's own policy."),
+    ...standing(state),
     el("h3", {}, "What changed, and why"),
     eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, state.decisions.length > 0),
-    ...decisionFeed(state, view, container, onLabel),
+    ...decisionFeed(state, view, container),
   );
 }
 
@@ -256,6 +256,56 @@ function runProgress(run, state) {
     );
   }
   return el("div", { class: "run" }, ...parts);
+}
+
+/**
+ * Where Warden stands. With no confirmed evidence there is nothing for a tile to report, and
+ * a row of dashes reads as a broken status bar — so until there is, it says plainly what is
+ * missing and what would change it.
+ */
+function standing(state) {
+  const { permission, policy } = state;
+  if (permission.right + permission.wrong > 0) {
+    return [
+      summaryTiles(state),
+      el("p", { class: "hint" }, "Proven accuracy is recomputed in your browser from the counts above, using the server's own policy."),
+    ];
+  }
+
+  const classified = state.decisions.length;
+  const waiting = state.decisions.filter((decision) => decision.label === null).length;
+  const uncountable = state.decisions.filter((decision) => decision.label !== null && !decision.counted).length;
+  const needed = correctCallsStillNeeded(0, 0, policy);
+
+  return [
+    el(
+      "div",
+      { class: "standing" },
+      el("p", {}, el("b", {}, "Warden has earned nothing here yet, so everything goes to you.")),
+      el(
+        "p",
+        {},
+        classified === 0
+          ? "Nothing has been classified here yet."
+          : `${classified} page${classified === 1 ? " has" : "s have"} been classified` +
+              (waiting > 0 ? `, ${waiting} still waiting for you to confirm.` : "."),
+      ),
+      uncountable > 0
+        ? el(
+            "p",
+            {},
+            `${uncountable} confirmed judgement${uncountable === 1 ? "" : "s"} did not move the record. Only a verdict of `,
+            el("b", {}, "phishing"),
+            " counts towards it: being right that a page is harmless is easy, and counting it would flatter the numbers.",
+          )
+        : null,
+      el(
+        "p",
+        { class: "muted" },
+        `Starting from nothing, ${needed} confirmed-correct phishing verdicts are needed before Warden could be trusted to act alone. That is the point of the bar, and why the demo exists.`,
+      ),
+    ),
+  ];
 }
 
 /** The permission at a glance, in plain language, with the bound recomputed from its counts. */
@@ -356,7 +406,7 @@ function mattered(decision) {
 }
 
 /** The decision feed: heading, view switch, caption and table. */
-function decisionFeed(state, view, container, onLabel) {
+function decisionFeed(state, view, container) {
   const { decisions } = state;
   if (decisions.length === 0) return [el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")];
 
@@ -388,7 +438,7 @@ function decisionFeed(state, view, container, onLabel) {
   if (shown.length === 0) {
     return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
   }
-  return [heading, caption, decisionTable(shown.slice().reverse(), onLabel)];
+  return [heading, caption, decisionTable(shown.slice().reverse())];
 }
 
 /** Explains what the current view shows, and where these pages came from. */
@@ -459,18 +509,18 @@ function campaignTable(decisions) {
 }
 
 /** The decision table, newest first. */
-function decisionTable(shown, onLabel) {
+function decisionTable(shown) {
   const head = el(
     "thead",
     {},
     el("tr", {}, ["Page", "Verdict", "Evidence cited", "Allowed to", "Block", "Confirmed"].map((t) => el("th", {}, t))),
   );
-  const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
+  const body = el("tbody", {}, shown.map((decision) => feedRow(decision)));
   return el("div", { class: "feed" }, el("table", {}, head, body));
 }
 
 /** One decision: what the page is, what the model said, and what it was allowed to do. */
-function feedRow(decision, onLabel) {
+function feedRow(decision) {
   return el(
     "tr",
     { "data-decision": decision.id },
@@ -479,7 +529,7 @@ function feedRow(decision, onLabel) {
     el("td", {}, evidenceCell(decision)),
     el("td", {}, checkBadge(decision.route)),
     el("td", {}, blockCell(decision)),
-    el("td", {}, labelCell(decision, onLabel)),
+    el("td", {}, labelCell(decision)),
   );
 }
 
@@ -525,8 +575,8 @@ function blockCell(decision) {
   return el("span", { class: `block-${decision.block}`, title }, decision.block === "reversed" ? "undone" : "in place");
 }
 
-/** The confirmed answer, or buttons to give one where a person may. */
-function labelCell(decision, onLabel) {
+/** The confirmed answer, or a note saying where to give one. */
+function labelCell(decision) {
   if (decision.label) {
     const title =
       decision.label === "right"
@@ -534,13 +584,7 @@ function labelCell(decision, onLabel) {
         : "Confirmed wrong: the verdict did not match what the page really is.";
     return el("span", { class: `label-${decision.label}`, title }, decision.label === "right" ? "verdict correct" : "verdict wrong");
   }
-  if (!onLabel) return el("span", { class: "muted" }, "not yet judged");
-  return el(
-    "div",
-    { class: "actions" },
-    el("button", { type: "button", class: "secondary", title: "The verdict was right", onclick: () => onLabel(decision.id, "right") }, "Correct"),
-    el("button", { type: "button", class: "secondary", title: "The verdict was wrong", onclick: () => onLabel(decision.id, "wrong") }, "Wrong"),
-  );
+  return el("span", { class: "muted", title: "Confirm it under Review — that is the only place a judgement is given." }, "waiting for you");
 }
 
 // Demo runs.
@@ -583,7 +627,7 @@ $("run-demo").addEventListener("click", async () => {
 let lastLiveState = null;
 
 $("live").addEventListener("rerender", () => {
-  if (lastLiveState) renderLedger($("live"), lastLiveState, { onLabel: labelLive });
+  if (lastLiveState) renderLedger($("live"), lastLiveState);
 });
 
 /** Loads and shows the live ledger and the review queue. */
@@ -596,7 +640,7 @@ async function loadLive() {
     return;
   }
   lastLiveState = res.data;
-  renderLedger($("live"), res.data, { onLabel: labelLive });
+  renderLedger($("live"), res.data);
   renderQueue(res.data);
 }
 
@@ -609,7 +653,7 @@ function renderQueue(state) {
   const blocked = waiting.filter((decision) => decision.block === "active");
   const rest = waiting.filter((decision) => decision.block !== "active");
 
-  $("queue-count").textContent = waiting.length === 0 ? "" : `${waiting.length} waiting`;
+  $("queue-count").textContent = waiting.length === 0 ? "" : String(waiting.length);
   if (waiting.length === 0) {
     $("queue").replaceChildren(
       el("p", { class: "empty" }, "Nothing waiting. Send Warden a page above and it will appear here for you to confirm."),
@@ -653,6 +697,13 @@ function queueCard(decision, urgent) {
       "div",
       { class: "card-ask" },
       urgent ? "This URL is blocked right now. Was that right?" : "Was Warden's verdict right?",
+      decision.counted
+        ? null
+        : el(
+            "div",
+            { class: "muted" },
+            "Recorded either way, but this one won't move Warden's record: only a verdict of phishing counts towards it.",
+          ),
     ),
     el(
       "div",
@@ -669,9 +720,20 @@ function queueCard(decision, urgent) {
 
 /** Records a person's judgement of a live decision, then reloads the ledger. */
 async function labelLive(decisionId, label) {
+  const decision = lastLiveState?.decisions.find((candidate) => candidate.id === decisionId);
   const res = await api("POST", "/live/labels", { decisionId, label });
-  showBanner(res.ok ? "" : explain(res));
-  loadLive();
+  if (!res.ok) {
+    showBanner(explain(res));
+    return;
+  }
+  // Without this, confirming a "not phishing" verdict leaves every number untouched and the
+  // page looks broken. It isn't: that verdict was never going to count.
+  showBanner(
+    decision && !decision.counted
+      ? "Recorded — but Warden's record is unchanged, because only a verdict of phishing counts towards it."
+      : "",
+  );
+  await loadLive();
 }
 
 $("refresh-live").addEventListener("click", loadLive);
@@ -765,23 +827,28 @@ $("try-form").addEventListener("submit", async (event) => {
   loadLive();
 });
 
-// Tabs: two records that would otherwise be two enormous blocks on one page.
-const TABS = [
-  ["tab-submissions", "panel-submissions"],
-  ["tab-demo", "panel-demo"],
+// Four pages rather than one long scroll. The number waiting to be reviewed shows on its
+// tab from wherever you are, because that is the one thing needing a person.
+const PAGES = [
+  ["nav-about", "page-about"],
+  ["nav-try", "page-try"],
+  ["nav-review", "page-review"],
+  ["nav-demo", "page-demo"],
 ];
 
-/** Shows one tab's panel and hides the others. */
-function showTab(chosen) {
-  for (const [tab, panel] of TABS) {
-    const selected = tab === chosen;
-    $(tab).classList.toggle("current", selected);
-    $(tab).setAttribute("aria-selected", String(selected));
-    $(panel).hidden = !selected;
+/** Shows one page and hides the rest. */
+function showPage(chosen) {
+  for (const [nav, page] of PAGES) {
+    const current = nav === chosen;
+    $(nav).classList.toggle("current", current);
+    if (current) $(nav).setAttribute("aria-current", "page");
+    else $(nav).removeAttribute("aria-current");
+    $(page).hidden = !current;
   }
+  window.scrollTo({ top: 0 });
 }
 
-for (const [tab] of TABS) $(tab).addEventListener("click", () => showTab(tab));
+for (const [nav] of PAGES) $(nav).addEventListener("click", () => showPage(nav));
 
 loadCorpus();
 loadLive();

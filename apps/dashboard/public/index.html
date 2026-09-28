@@ -13,12 +13,18 @@
         <h1>Warden</h1>
         <p>Phishing triage where the AI has to earn the right to act.</p>
       </div>
+      <nav class="nav" aria-label="Sections">
+        <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
+        <button id="nav-try" type="button" class="tab">Send a page</button>
+        <button id="nav-review" type="button" class="tab">Review <span id="queue-count" class="queue-count"></span></button>
+        <button id="nav-demo" type="button" class="tab">Demo run</button>
+      </nav>
     </header>
 
     <p id="banner" class="banner" role="status" hidden></p>
 
     <main>
-      <section class="explainer" aria-labelledby="about-title">
+      <section id="page-about" class="explainer" aria-labelledby="about-title">
         <h2 id="about-title">What this is</h2>
         <p class="lede">
           An AI can tell you a page looks like phishing in a second. Deciding whether it may take that page down by
@@ -53,15 +59,21 @@
           <li><b>On trial</b><span>The evidence is strong enough, but it must hold for ten more calls.</span></li>
           <li><b>Acts alone</b><span>It may block a URL itself — up to three awaiting review at once.</span></li>
         </ol>
+        <p class="note">
+          <b>Where to go from here.</b> <b>Send a page</b> puts one page through Warden and shows every step.
+          <b>Review</b> is where you confirm whether its verdicts were right — the only thing that moves its record.
+          <b>Demo run</b> plays the whole story out against a set of pages whose answers are already known.
+        </p>
       </section>
 
-      <section aria-labelledby="try-title">
+      <section id="page-try" hidden aria-labelledby="try-title">
         <div class="section-head">
           <h2 id="try-title">Send Warden a page</h2>
         </div>
         <p class="note">
           Pick one of the test pages, or paste your own. You'll see every step: what was extracted from the page, what
-          the model said, whether its evidence checked out, and what it was allowed to do about it.
+          the model said, whether its evidence checked out, and what it was allowed to do about it. Then confirm the
+          verdict under <b>Review</b>.
         </p>
         <form id="try-form" class="try">
           <label for="try-pick">Test page</label>
@@ -77,19 +89,10 @@
         <div id="try-result"></div>
       </section>
 
-      <div class="tabs" role="tablist" aria-label="Which record to show">
-        <button id="tab-submissions" type="button" role="tab" class="tab current" aria-selected="true" aria-controls="panel-submissions">
-          Pages you sent
-        </button>
-        <button id="tab-demo" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-demo">
-          Demo run
-        </button>
-      </div>
-
-      <section id="panel-submissions" role="tabpanel" aria-labelledby="tab-submissions">
+      <section id="page-review" hidden aria-labelledby="review-title">
         <div class="section-head">
-          <h2>Waiting for you</h2>
-          <span id="queue-count" class="queue-count"></span>
+          <h2 id="review-title">Waiting for you</h2>
+          <button id="refresh-live" type="button" class="secondary">Refresh</button>
         </div>
         <p class="note">
           Warden's verdicts mean nothing until a person confirms them — that confirmation is the only thing that moves
@@ -100,7 +103,6 @@
 
         <div class="section-head">
           <h2>Warden's record here</h2>
-          <button id="refresh-live" type="button" class="secondary">Refresh</button>
         </div>
         <p class="note">
           What Warden has earned on the pages you send it. This record is permanent and entirely separate from the
@@ -110,9 +112,9 @@
         <div id="live" class="ledger"><p class="empty">Loading…</p></div>
       </section>
 
-      <section id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <section id="page-demo" hidden aria-labelledby="demo-title">
         <div class="section-head">
-          <h2>Watch it earn permission</h2>
+          <h2 id="demo-title">Watch it earn permission</h2>
           <button id="run-demo" type="button">Run the demo</button>
         </div>
         <p class="note">
