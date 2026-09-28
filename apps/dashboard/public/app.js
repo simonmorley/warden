@@ -167,13 +167,16 @@ const REASONS = {
   duplicate: ["already seen", "This page had already been decided here, so it counts once."],
 };
 
-/** What the permission check did with a decision. */
+/**
+ * What became of a decision, as an outcome rather than a reason. "Cap full" answers a
+ * different question from the one the column asks; "sent to a person — cap full" answers it.
+ */
 function checkBadge(route) {
   if (route.to === "block") {
-    return el("span", { class: "badge blocked", title: "Warden blocked this URL on its own, with no person involved." }, "blocked");
+    return el("span", { class: "badge blocked", title: "Warden blocked this URL on its own, with no person involved." }, "blocked automatically");
   }
   const [short, full] = REASONS[route.reason] ?? [route.reason, route.reason];
-  return el("span", { class: "badge", title: full }, short);
+  return el("span", { class: "badge", title: full }, `sent to a person — ${short}`);
 }
 
 /** One summary tile. */
@@ -262,7 +265,7 @@ const views = new Map();
 function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
-  const view = views.get(container.id) ?? (state.decisions.length > 20 ? "mattered" : "all");
+  const view = views.get(container.id) ?? (state.decisions.length > 20 ? "campaigns" : "all");
   container.replaceChildren(
     ...(state.run ? [runProgress(state.run, state)] : []),
     ...standing(state),
@@ -388,7 +391,14 @@ function story(state, run) {
   const running = run.status === "running";
 
   const beats = [
-    [state.permission.right > 0, `Built a record — ${state.permission.right} confirmed-correct calls so far`],
+    [
+      state.permission.right > 0,
+      // The record when the bar was cleared, not the record now: this line sits above beats
+      // that happened at 73 and 83, and the current count reads as though it was enough.
+      promotions.length > 0
+        ? `Built a record — ${promotions[0].event.tally.right} confirmed-correct calls before anything changed`
+        : `Building a record — ${state.permission.right} confirmed-correct so far`,
+    ],
     [promotions.some((p) => p.event.to === "EARNING"), "Cleared the bar, and went on trial"],
     [promotions.some((p) => p.event.to === "AUTONOMOUS"), "Passed the trial — allowed to act alone"],
     [blocked > 0, `Blocked ${blocked} URL${blocked === 1 ? "" : "s"} with no person involved`],
@@ -558,8 +568,8 @@ function decisionFeed(state, view, container, onLabel) {
     el(
       "div",
       { class: "views" },
-      viewButton("mattered", "What mattered", view, container),
       viewButton("campaigns", "By campaign", view, container),
+      viewButton("mattered", "What mattered", view, container),
       viewButton("all", "Everything", view, container),
     ),
   );
@@ -567,10 +577,15 @@ function decisionFeed(state, view, container, onLabel) {
 
   if (view === "campaigns") return [heading, caption, campaignTable(decisions)];
 
-  const shown = view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120);
-  if (shown.length === 0) {
-    return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
+  if (view === "mattered") {
+    const notable = decisions.filter(mattered);
+    if (notable.length === 0) {
+      return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
+    }
+    return [heading, caption, matteredTable(notable, container)];
   }
+
+  const shown = decisions.slice(-120);
   return [heading, caption, decisionTable(shown.slice().reverse(), onLabel)];
 }
 
@@ -599,6 +614,80 @@ function viewButton(id, label, current, container) {
     },
     label,
   );
+}
+
+/**
+ * What mattered, with repetition collapsed. Six identical "assembled at runtime · cap full ·
+ * correct" rows are one fact stated six times; a reviewer should see the fact and its count.
+ */
+function matteredTable(notable, container) {
+  const groups = new Map();
+  for (const decision of notable) {
+    const page = corpus.byUrl.get(decision.url);
+    const outcome = outcomeOf(decision);
+    const key = `${page?.campaign ?? "unknown"}|${outcome}`;
+    const group = groups.get(key) ?? {
+      technique: page?.technique ?? decision.url,
+      truth: page?.truth ?? null,
+      outcome,
+      route: decision.route,
+      count: 0,
+      first: decision,
+    };
+    group.count++;
+    groups.set(key, group);
+  }
+
+  const head = el("thead", {}, el("tr", {}, ["Page", "Outcome", "Times"].map((t) => el("th", {}, t))));
+  const body = el(
+    "tbody",
+    {},
+    [...groups.values()]
+      .sort((a, b) => b.count - a.count)
+      .map((group) =>
+        el(
+          "tr",
+          {},
+          el(
+            "td",
+            {},
+            el("div", { class: "technique" }, group.technique),
+            group.truth
+              ? el(
+                  "span",
+                  { class: group.truth === "phishing" ? "truth-phishing" : "truth-legitimate" },
+                  group.truth === "phishing" ? "really phishing" : "really legitimate",
+                )
+              : null,
+          ),
+          el("td", {}, checkBadge(group.route), " ", el("span", { class: "muted" }, group.outcome)),
+          el(
+            "td",
+            {},
+            el(
+              "button",
+              {
+                type: "button",
+                class: "event-link",
+                title: "Show one of these in the full list",
+                onclick: () => revealDecision(container, group.first.id),
+              },
+              `${group.count}×`,
+            ),
+          ),
+        ),
+      ),
+  );
+  return el("div", { class: "feed" }, el("table", {}, head, body));
+}
+
+/** How a decision ended, in the words a reviewer would use to describe it. */
+function outcomeOf(decision) {
+  if (!decision.valid) return `answer rejected: ${decision.rejection}`;
+  if (decision.block === "reversed") return "blocked, then undone as wrong";
+  if (decision.label === "wrong") return "verdict was wrong";
+  if (decision.verdict === "uncertain") return "model would not commit";
+  return decision.label === "right" ? "verdict was correct" : "awaiting judgement";
 }
 
 /** One row per campaign: the padding collapsed into counts. */
@@ -646,7 +735,7 @@ function decisionTable(shown, onLabel) {
   const head = el(
     "thead",
     {},
-    el("tr", {}, ["Page", "Verdict", "Evidence cited", "Allowed to", "Block", "Confirmed"].map((t) => el("th", {}, t))),
+    el("tr", {}, ["Page", "Verdict", "Evidence cited", "Outcome", "Block", "Confirmed"].map((t) => el("th", {}, t))),
   );
   const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
   return el("div", { class: "feed" }, el("table", {}, head, body));

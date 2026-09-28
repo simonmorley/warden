@@ -85,6 +85,18 @@ Two things fall out of this.
 
 That is also why the trap pages carry almost no structural signal. A model that calls one phishing can only have got it from the page's text, and the evidence rule means it still has to cite a signal that really exists. A fabricated verdict cannot produce fabricated evidence.
 
+## Two findings from running it
+
+**Evasion does not work on this model; weaponised reporting does.** Every evasion page — phishing that tells the reviewer it is legitimate — was correctly called phishing, 14 out of 14 across the campaign. Every trap that worked did so in the other direction: a *third party* asserting the page is malicious. The model discounts a page vouching for itself and credits a page reporting someone else, and nothing in the prompt told it to.
+
+That is worth knowing beyond this project. It means the exploitable direction is the one that produces false positives, not false negatives — which is exactly the direction Warden's design is built to bound, and exactly the direction most prompt-injection defences are not thinking about.
+
+It also means half the injection story demonstrates nothing in a run. That is honest and stays: a test the model passes is a result, not a gap to paper over.
+
+**The revocation rests on a minority of the traps.** Of five framings, two fooled it, two it saw through, and one it called phishing while citing no evidence, so the evidence rule rejected it before it could act. The arc therefore has an ending because roughly two in five traps land. If the model tightens, the run finishes without a revocation — the dashboard says so plainly, but the demonstration is weaker.
+
+Two further framings were added for that reason: not to make the demo land, but because five framings were too few to say anything about injection robustness. Seven is still few. The right response to a run without a revocation is to report it, not to tune the set until it goes the desired way.
+
 ## A limit worth naming
 
 Fixtures use reserved domain names only, so the `free_hosting` signal never fires on them — the real platforms it matches are live hosts, and the safety check refuses those. The survey found free hosting on 11 of 17 live pages, so it is a common signal that this set cannot exercise. It is covered by unit tests in `packages/signals` instead, where a hostname is an assertion rather than a published page.

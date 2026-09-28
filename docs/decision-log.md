@@ -6,6 +6,23 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — Injection works in one direction only, and the demo's ending depends on it
+
+**Found.** Running the whole set through the chosen model:
+
+- **Every evasion page was caught.** Phishing that tells the reviewer it is legitimate was correctly called phishing, 14 out of 14. The model does not credit a page vouching for itself.
+- **Every trap that worked came from a third party.** A forum post, a review, an issue tracker, a support ticket, all asserting *someone else's* page is malicious. Two of five framings fooled it; one more it called phishing while citing no evidence, so the evidence rule rejected it before it could act.
+
+**Why it matters.** The exploitable direction produces false positives, not false negatives. That is the direction Warden bounds by design, and the direction most prompt-injection thinking neglects. It also means the demo's ending rests on roughly two framings in five landing: if the model tightens, a run finishes with nothing to revoke.
+
+**Changed.** Two further trap framings, a profile bio and a classified listing. Not to make the arc land — the right answer to a run without a revocation is to report it, which the dashboard does — but because five framings were too few to claim anything about injection robustness. Seven is still few.
+
+**Raised by.** Review of a completed run.
+
+**Docs.** `packages/fixtures/README.md`.
+
+---
+
 ## 2026-09-28 — Warden fetches a reported URL
 
 **Changed.** `POST /classify` takes a URL on its own and fetches the page. Supplying the source still works and skips the fetch.
