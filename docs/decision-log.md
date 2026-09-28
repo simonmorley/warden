@@ -6,6 +6,16 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — PhishTank joins the candidate sources
+
+**Changed.** PhishTank is added to the feeds used to find fixture candidates.
+
+**Why.** It is phishing-specific. Its community "verified" flag is a vote, so it gets the same treatment as every other feed: it finds candidates, and a person sets the label. Its data is not vendored into the repository, and its terms get checked when the fixture set is built.
+
+**Raised by.** The user.
+
+**Docs.** Technical design §3C.
+
 ## 2026-09-28 — A command-line client joins the plan and absorbs the verifier
 
 **Changed.** The technical design had an optional black-box verifier as its last step. It now has a CLI: a thin client for the same HTTP API, pointed at `wrangler dev` or a deployment.

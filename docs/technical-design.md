@@ -69,7 +69,7 @@ Rejection paths — malformed responses, citations of signals that don't exist, 
 
 #### Where fixtures come from
 
-**Feeds find candidates; they never label.** Use phishing-focused sources — OpenPhish, Phishing Army, and public scans on urlscan.io. Feeds aggregate other feeds and community submissions, so treating one as ground truth is the vendor-asserted accuracy the PRD rejects in section 2. Don't use URLhaus or ThreatFox here; they track malware distribution and malware IOCs, not phishing pages.
+**Feeds find candidates; they never label.** Use phishing-focused sources — OpenPhish, PhishTank, Phishing Army, and public scans on urlscan.io. PhishTank's "verified" flag is a community vote, so it is another assertion, not a label. Feeds aggregate other feeds and community submissions, so treating one as ground truth is the vendor-asserted accuracy the PRD rejects in section 2. Don't use URLhaus or ThreatFox here; they track malware distribution and malware IOCs, not phishing pages.
 
 **Every label is set by a person.** Generated variants inherit their seed's label. No label comes from a feed.
 
