@@ -26,13 +26,23 @@ export interface Outcome {
  * stale, and a stale decision can't block (PRD 7.2).
  */
 export async function decide(ledger: LedgerPort, model: Model, scope: Scope, page: Page): Promise<Outcome> {
-  const identity = pageIdentity(page.url);
+  pageIdentity(page.url);
   const epochSeen = await ledger.epoch();
   const analysis = analyse(page);
   const classification = await classify(model, page.url, analysis);
+  const submission = await ledger.submit(await submissionFor(page, classification, epochSeen, scope));
+  return { analysis, classification, submission };
+}
 
-  const submission = await ledger.submit({
-    page: { identity, url: page.url, contentHash: await sha256Hex(page.html) },
+/** Turns a classification into what the ledger records. Shared by try-it-live and demo runs. */
+export async function submissionFor(
+  page: Page,
+  classification: Classification,
+  epochSeen: number,
+  scope: Scope,
+): Promise<SubmitInput> {
+  return {
+    page: { identity: pageIdentity(page.url), url: page.url, contentHash: await sha256Hex(page.html) },
     // A rejected response still needs a verdict on record; the ledger routes it to a human
     // and it never counts, whatever this says.
     verdict: classification.ok ? classification.verdict : (classification.verdict ?? "uncertain"),
@@ -43,7 +53,5 @@ export async function decide(ledger: LedgerPort, model: Model, scope: Scope, pag
     rawResponse: classification.raw,
     epochSeen,
     scope,
-  });
-
-  return { analysis, classification, submission };
+  };
 }
