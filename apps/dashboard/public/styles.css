@@ -173,10 +173,20 @@ button:disabled {
 .banner {
   margin: 1rem clamp(1rem, 4vw, 3rem) 0;
   padding: 0.7rem 1rem;
-  border: 1px solid var(--earning);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: var(--earning);
   background: var(--panel);
+}
+
+/* An explanation of the rules is not a failure, and must not be dressed as one. */
+.banner.info {
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+}
+
+.banner.error {
+  border-left: 3px solid var(--danger);
+  color: var(--danger);
 }
 
 .tiles {

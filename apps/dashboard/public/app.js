@@ -80,10 +80,14 @@ function explain(res) {
   return res.data?.message ?? `The server answered ${res.status}.`;
 }
 
-/** Shows a message across the top of the page; an empty message hides it. */
-function showBanner(text) {
+/**
+ * Shows a message across the top of the page; an empty message hides it. Notes and failures
+ * look different: styling an explanation like an error makes people think something broke.
+ */
+function showBanner(text, kind = "error") {
   const banner = $("banner");
   banner.textContent = text;
+  banner.className = `banner ${kind}`;
   banner.hidden = !text;
 }
 
@@ -700,8 +704,9 @@ async function labelLive(decisionId, label) {
   // page looks broken. It isn't: that verdict was never going to count.
   showBanner(
     decision && !decision.counted
-      ? "Recorded — but Warden's record is unchanged, because only a verdict of phishing counts towards it."
-      : "",
+      ? "Saved. The figures below are unchanged, which is expected: only a verdict of phishing counts towards Warden's record."
+      : "Saved.",
+    "info",
   );
   await loadLive();
 }
@@ -725,7 +730,7 @@ $("reset-live").addEventListener("click", async () => {
     return;
   }
   const res = await api("POST", "/live/reset");
-  showBanner(res.ok ? "" : explain(res));
+  showBanner(res.ok ? "Record cleared. Warden starts again with no permission to act." : explain(res), res.ok ? "info" : "error");
   await loadLive();
 });
 
@@ -839,7 +844,22 @@ function showPage(chosen) {
   window.scrollTo({ top: 0 });
 }
 
-for (const [nav] of PAGES) $(nav).addEventListener("click", () => showPage(nav));
+/** The address bar names the page, so a refresh or a shared link lands in the same place. */
+const ROUTES = { "#how-it-works": "nav-about", "#send": "nav-try", "#review": "nav-review", "#demo": "nav-demo" };
+
+function routeFromHash() {
+  showPage(ROUTES[window.location.hash] ?? "nav-about");
+}
+
+for (const [nav] of PAGES) {
+  const hash = Object.keys(ROUTES).find((key) => ROUTES[key] === nav);
+  $(nav).addEventListener("click", () => {
+    window.location.hash = hash;
+  });
+}
+
+window.addEventListener("hashchange", routeFromHash);
+routeFromHash();
 
 loadCorpus();
 loadLive();
