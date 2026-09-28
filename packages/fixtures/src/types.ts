@@ -1,11 +1,12 @@
-/** Where a seed came from. Never the live URL itself: only hashes and the feed's own reference. */
+/**
+ * Where a fixture's technique came from. There is no captured original: a fixture is written
+ * from a technique a survey found, so this records the survey and the technique, and no URL.
+ */
 export interface Provenance {
-  readonly feed: string;
-  readonly entryId: string;
-  readonly firstSeen: string;
-  readonly capturedAt: string;
-  readonly urlSha256: string;
-  readonly pageSha256: string;
+  /** The survey this technique came from, e.g. "openphish-2026-09-28". */
+  readonly survey: string;
+  /** The technique the page exhibits, in the survey's terms. */
+  readonly technique: string;
 }
 
 export type Category =
@@ -32,7 +33,7 @@ export interface Fixture {
   readonly category: Category;
   /** Siblings from the same kit share a campaign, which makes their correlation visible. */
   readonly campaign: string;
-  /** Set for seeds built from a feed candidate; null for pages built by hand. */
+  /** Set when a survey prompted this page; null for one written to cover a gap. */
   readonly provenance: Provenance | null;
   /** For a generated variant: the seed it came from. */
   readonly seed?: string;

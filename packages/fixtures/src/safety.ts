@@ -15,6 +15,9 @@ export function checkFixture(fixture: Fixture): Violation[] {
   for (const host of hostsIn(everything)) {
     if (!isReserved(host)) flag("live_url", host);
   }
+  for (const host of hostsInProse(provenanceOf(fixture))) {
+    if (!isReserved(host)) flag("live_url", `${host} (in provenance)`);
+  }
 
   // No working targets: nothing may send data anywhere that resolves. That includes
   // example.com, which IANA really does serve, so only .invalid will do.
@@ -98,6 +101,24 @@ function* scriptBodies(html: string): Generator<string> {
   for (const [, body] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
     if (body !== undefined) yield body;
   }
+}
+
+/** A fixture's provenance as one string: short, structured text we wrote ourselves. */
+function provenanceOf(fixture: Fixture): string {
+  if (!fixture.provenance) return "";
+  return `${fixture.provenance.survey} ${fixture.provenance.technique}`;
+}
+
+/**
+ * Host-shaped words in prose, where there is no scheme to anchor on. Deliberately eager:
+ * it will flag "Node.js" as a host. In a short provenance note that trade is worth making,
+ * because the cost is rewording a sentence and the cost of missing one is a live host in a
+ * public repository.
+ */
+const PROSE_HOST = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b/gi;
+
+function* hostsInProse(text: string): Generator<string> {
+  for (const [host] of text.matchAll(PROSE_HOST)) yield host.toLowerCase();
 }
 
 const EMAIL = /[a-z0-9._%+-]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/gi;
