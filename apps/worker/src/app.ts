@@ -48,11 +48,7 @@ export function createApp(dependencies: Dependencies) {
         ({ match }) => match !== null,
       );
 
-      if (!matched) {
-        const asset = await env.ASSETS.fetch(request);
-        if (asset.status !== 404) return withSecurityHeaders(asset);
-        return problem(404, "not_found", `Nothing at ${request.method} ${pathname}`);
-      }
+      if (!matched) return serveAsset(request, env, pathname);
 
       const route = matched.candidate.handlers;
       const handler = route[request.method];
@@ -173,6 +169,13 @@ async function openLive(env: Env, dependencies: Dependencies, scope: Scope) {
   const opened = await stub.open("live", scope);
   if (!opened.ok) throw new Error(`could not open the live ledger: ${opened.error}`);
   return { stub, epoch: opened.permission.epoch };
+}
+
+/** Serves a dashboard file with the security headers, or a JSON 404 when there's no such file. */
+async function serveAsset(request: Request, env: Env, pathname: string): Promise<Response> {
+  const asset = await env.ASSETS.fetch(request);
+  if (asset.status === 404) return problem(404, "not_found", `Nothing at ${request.method} ${pathname}`);
+  return withSecurityHeaders(asset);
 }
 
 /**

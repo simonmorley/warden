@@ -75,11 +75,9 @@ export function freeHostingPlatform(host: string): string | null {
  */
 export function siteOf(host: string): string {
   const platform = freeHostingPlatform(host);
-  if (platform !== null && host !== platform) {
-    const prefix = host.slice(0, -platform.length - 1).split(".");
-    return `${prefix[prefix.length - 1]}.${platform}`;
-  }
-  return host.split(".").slice(-2).join(".");
+  if (platform === null || host === platform) return host.split(".").slice(-2).join(".");
+  const prefix = host.slice(0, -platform.length - 1).split(".");
+  return `${prefix[prefix.length - 1]}.${platform}`;
 }
 
 export function isIpLiteral(host: string): boolean {

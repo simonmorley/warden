@@ -75,9 +75,16 @@ export function parsePage(html: string): ParsedPage {
         }
       },
       ontext(text) {
-        if (script) script.push(text);
-        else if (inTitle) title += text;
-        else if (hiddenDepth === 0) page.text.push(text);
+        if (script) {
+          script.push(text);
+          return;
+        }
+        if (inTitle) {
+          title += text;
+          return;
+        }
+        if (hiddenDepth > 0) return;
+        page.text.push(text);
       },
       onclosetag(name) {
         if (NOT_TEXT.has(name)) hiddenDepth = Math.max(0, hiddenDepth - 1);

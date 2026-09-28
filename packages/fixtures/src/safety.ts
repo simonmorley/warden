@@ -103,17 +103,20 @@ function* scriptBodies(html: string): Generator<string> {
 const EMAIL = /[a-z0-9._%+-]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/gi;
 const CARD_LIKE = /(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])/g;
 
+/** The Luhn checksum every payment card number passes. */
 function passesLuhn(digits: string): boolean {
   let sum = 0;
   for (let i = 0; i < digits.length; i++) {
-    let digit = Number(digits[digits.length - 1 - i]);
-    if (i % 2 === 1) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    sum += digit;
+    const digit = Number(digits[digits.length - 1 - i]);
+    sum += i % 2 === 1 ? doubledDigit(digit) : digit;
   }
   return sum % 10 === 0;
+}
+
+/** Luhn doubles every second digit from the right and sums the result's digits. */
+function doubledDigit(digit: number): number {
+  const doubled = digit * 2;
+  return doubled > 9 ? doubled - 9 : doubled;
 }
 
 /**

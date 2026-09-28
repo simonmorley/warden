@@ -1,3 +1,4 @@
+import { initialPermission } from "./permission";
 import type { EngineEvent, Label, LabelledDecision, LabelOutcome, Permission, Policy, Tally } from "./types";
 import { wilsonLowerBound } from "./wilson";
 
@@ -14,94 +15,57 @@ export function applyLabel(
   label: Label,
   policy: Policy,
 ): LabelOutcome {
-  let next = permission;
+  if (decision.blocked && permission.unreviewed < 1) {
+    throw new RangeError("a blocked decision was labelled, but no unreviewed block is on record");
+  }
 
   // A label is the review of the block, whichever way it goes, so it frees the slot.
-  if (decision.blocked) {
-    if (next.unreviewed < 1) {
-      throw new RangeError("a blocked decision was labelled, but no unreviewed block is on record");
-    }
-    next = { ...next, unreviewed: next.unreviewed - 1 };
-  }
-
+  const reviewed = decision.blocked ? { ...permission, unreviewed: permission.unreviewed - 1 } : permission;
   // Old epochs stay on record but stop counting.
   const counts = decision.counted && decision.epoch === permission.epoch;
-  if (counts) {
-    next = label === "right" ? { ...next, right: next.right + 1 } : { ...next, wrong: next.wrong + 1 };
-  }
+  const next = counts ? counted(reviewed, label) : reviewed;
 
-  if (decision.blocked && label === "wrong") {
-    const reversed: EngineEvent = { kind: "reversed", blockEpoch: decision.epoch };
-
-    // That epoch's permission is already gone: undo the block and change nothing else.
-    if (decision.epoch !== permission.epoch) {
-      return { permission: next, reverse: true, events: [reversed] };
-    }
-
-    // Anything earned since this block was authorised rests on a record that included
-    // a mistake nobody had confirmed yet, so the epoch starts again from zero.
-    const revoked: EngineEvent = { kind: "revoked", nextEpoch: permission.epoch + 1, tally: tally(next, policy) };
-    return {
-      permission: {
-        epoch: permission.epoch + 1,
-        state: "SHADOW",
-        right: 0,
-        wrong: 0,
-        probation: 0,
-        unreviewed: next.unreviewed,
-      },
-      reverse: true,
-      events: [revoked, reversed],
-    };
-  }
-
-  if (!counts) return { permission: next, reverse: false, events: [] };
+  if (decision.blocked && label === "wrong") return wrongBlock(permission, next, decision, policy);
+  if (!counts) return noEvent(next);
   return transition(next, label, policy);
+}
+
+/** Adds the label to the track record. */
+function counted(permission: Permission, label: Label): Permission {
+  if (label === "right") return { ...permission, right: permission.right + 1 };
+  return { ...permission, wrong: permission.wrong + 1 };
+}
+
+/**
+ * A wrong automatic block is always reversed. If the current epoch authorised it, that
+ * epoch is revoked too; if an older one did, its permission is already gone (PRD 7.2).
+ */
+function wrongBlock(before: Permission, after: Permission, decision: LabelledDecision, policy: Policy): LabelOutcome {
+  const reversed: EngineEvent = { kind: "reversed", blockEpoch: decision.epoch };
+  if (decision.epoch !== before.epoch) return { permission: after, reverse: true, events: [reversed] };
+
+  // Anything earned since this block was authorised rests on a record that included a
+  // mistake nobody had confirmed yet, so the epoch starts again from zero.
+  const revoked: EngineEvent = { kind: "revoked", nextEpoch: before.epoch + 1, tally: tally(after, policy) };
+  return {
+    permission: { ...initialPermission(), epoch: before.epoch + 1, unreviewed: after.unreviewed },
+    reverse: true,
+    events: [revoked, reversed],
+  };
 }
 
 /** Re-evaluates the state after a counted label that didn't revoke anything. */
 function transition(permission: Permission, label: Label, policy: Policy): LabelOutcome {
   const current = tally(permission, policy);
   const clears = current.bound !== null && current.bound >= policy.requiredScore;
-  const outcome = (next: Permission, events: EngineEvent[] = []): LabelOutcome => ({
-    permission: next,
-    reverse: false,
-    events,
-  });
 
   switch (permission.state) {
     case "SHADOW":
-      if (!clears) return outcome(permission);
-      // The label that crosses the bar opens probation; it isn't the first check of it.
-      return outcome({ ...permission, state: "EARNING", probation: 0 }, [
-        { kind: "promoted", from: "SHADOW", to: "EARNING", tally: current },
-      ]);
-
-    case "EARNING": {
-      if (label === "right") {
-        const probation = permission.probation + 1;
-        if (probation < policy.probationLength) return outcome({ ...permission, probation });
-        return outcome({ ...permission, state: "AUTONOMOUS", probation: 0 }, [
-          { kind: "promoted", from: "EARNING", to: "AUTONOMOUS", tally: current },
-        ]);
-      }
-      if (!clears) {
-        return outcome({ ...permission, state: "SHADOW", probation: 0 }, [
-          { kind: "demoted", from: "EARNING", to: "SHADOW", tally: current },
-        ]);
-      }
-      // Probation is a run of checks, so any mistake restarts it, bar or no bar.
-      return outcome({ ...permission, probation: 0 }, [{ kind: "probation_restarted", tally: current }]);
-    }
-
+      return fromShadow(permission, current, clears);
+    case "EARNING":
+      return fromEarning(permission, label, current, clears, policy);
     case "AUTONOMOUS":
-      if (clears) return outcome(permission);
-      // Late labels on verdicts that queued for a human can pull the bound under the bar.
-      // Nothing was acted on, so nothing is reversed and the epoch stands.
-      return outcome({ ...permission, state: "SHADOW" }, [
-        { kind: "demoted", from: "AUTONOMOUS", to: "SHADOW", tally: current },
-      ]);
-
+      return fromAutonomous(permission, current, clears);
     default: {
       const unreachable: never = permission.state;
       throw new RangeError(`unknown permission state: ${String(unreachable)}`);
@@ -109,6 +73,59 @@ function transition(permission: Permission, label: Label, policy: Policy): Label
   }
 }
 
+/** SHADOW enters EARNING when the bound clears the bar. That label opens probation; it isn't its first check. */
+function fromShadow(permission: Permission, current: Tally, clears: boolean): LabelOutcome {
+  if (!clears) return noEvent(permission);
+  return withEvent({ ...permission, state: "EARNING", probation: 0 }, {
+    kind: "promoted",
+    from: "SHADOW",
+    to: "EARNING",
+    tally: current,
+  });
+}
+
+/** EARNING counts correct checks in a row. A mistake restarts probation, or drops to SHADOW if it breaks the bar. */
+function fromEarning(permission: Permission, label: Label, current: Tally, clears: boolean, policy: Policy): LabelOutcome {
+  if (label === "right") return passCheck(permission, current, policy);
+  if (!clears) {
+    return withEvent({ ...permission, state: "SHADOW", probation: 0 }, {
+      kind: "demoted",
+      from: "EARNING",
+      to: "SHADOW",
+      tally: current,
+    });
+  }
+  // Probation is a run of checks, so any mistake restarts it, bar or no bar.
+  return withEvent({ ...permission, probation: 0 }, { kind: "probation_restarted", tally: current });
+}
+
+/** One more correct check in probation; the last one promotes to AUTONOMOUS. */
+function passCheck(permission: Permission, current: Tally, policy: Policy): LabelOutcome {
+  const probation = permission.probation + 1;
+  if (probation < policy.probationLength) return noEvent({ ...permission, probation });
+  return withEvent({ ...permission, state: "AUTONOMOUS", probation: 0 }, {
+    kind: "promoted",
+    from: "EARNING",
+    to: "AUTONOMOUS",
+    tally: current,
+  });
+}
+
+/**
+ * AUTONOMOUS drops to SHADOW, same epoch, when late labels on verdicts that queued for a
+ * person pull the bound under the bar. Nothing was acted on, so nothing is reversed.
+ */
+function fromAutonomous(permission: Permission, current: Tally, clears: boolean): LabelOutcome {
+  if (clears) return noEvent(permission);
+  return withEvent({ ...permission, state: "SHADOW" }, {
+    kind: "demoted",
+    from: "AUTONOMOUS",
+    to: "SHADOW",
+    tally: current,
+  });
+}
+
+/** The numbers a decision rests on, so anyone can recompute it. */
 function tally(permission: Permission, policy: Policy): Tally {
   return {
     epoch: permission.epoch,
@@ -116,4 +133,14 @@ function tally(permission: Permission, policy: Policy): Tally {
     wrong: permission.wrong,
     bound: wilsonLowerBound(permission.right, permission.right + permission.wrong, policy.z),
   };
+}
+
+/** An outcome with nothing to announce. */
+function noEvent(permission: Permission): LabelOutcome {
+  return { permission, reverse: false, events: [] };
+}
+
+/** An outcome that announces one change. */
+function withEvent(permission: Permission, event: EngineEvent): LabelOutcome {
+  return { permission, reverse: false, events: [event] };
 }

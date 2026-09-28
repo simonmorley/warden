@@ -155,18 +155,9 @@ const URGENCY = /suspended|unusual activity|within \d+ hours|will be (?:locked|c
 const LOGIN = /sign[\s-]?in|log[\s-]?in|\bpassword\b/i;
 const HUMAN_CHECK = /verify you are human|not a robot|human verification|captcha|security check/i;
 
+/** Signals from what the page says and shows: brand, urgency, login and human-check prompts, assets, frames. */
 function contentSignals(page: ParsedPage, pageHost: string, raise: Raise) {
-  const claim = claimedName(page);
-  if (claim !== null) {
-    raise("brand_claim", claim);
-    const words = claim
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((word) => word.length >= 3 && !GENERIC_NAME_WORDS.has(word));
-    if (words.length > 0 && !words.some((word) => pageHost.includes(word))) {
-      raise("brand_host_mismatch", `claims to be "${claim}" on ${pageHost}`);
-    }
-  }
+  brandSignals(page, pageHost, raise);
 
   const text = `${page.title} ${page.text.join(" ")}`;
   const urgency = URGENCY.exec(text);
@@ -198,6 +189,20 @@ function contentSignals(page: ParsedPage, pageHost: string, raise: Raise) {
   if (page.metas.some((meta) => meta["name"]?.toLowerCase() === "robots" && /noindex/i.test(meta["content"] ?? ""))) {
     raise("noindex", "asks search engines not to index it");
   }
+}
+
+/** Names the organisation the page claims to be, and flags it when that name appears nowhere in the host. */
+function brandSignals(page: ParsedPage, pageHost: string, raise: Raise) {
+  const claim = claimedName(page);
+  if (claim === null) return;
+  raise("brand_claim", claim);
+
+  const words = claim
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3 && !GENERIC_NAME_WORDS.has(word));
+  if (words.length === 0 || words.some((word) => pageHost.includes(word))) return;
+  raise("brand_host_mismatch", `claims to be "${claim}" on ${pageHost}`);
 }
 
 /** The organisation a page claims to be, from its title or its logo, if it names one. */
