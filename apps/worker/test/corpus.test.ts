@@ -7,6 +7,25 @@ const model: Model = { id: "@cf/test/model", complete: async () => "{}" };
 const app = createApp({ model: () => model, liveLedgerName: () => "live:corpus", demoPlan: () => [] });
 const get = (path: string) => app.fetch(new Request(`https://warden.test${path}`), env);
 
+describe("GET /corpus/pages/:id", () => {
+  it("hands back one page's source, so the picker can load it without anyone writing HTML", async () => {
+    const { techniques } = await (await get("/corpus")).json<{ techniques: { id: string }[] }>();
+    const res = await get(`/corpus/pages/${techniques[0]!.id}`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: techniques[0]!.id,
+      url: expect.any(String),
+      html: expect.stringContaining("<"),
+      truth: expect.stringMatching(/^(phishing|legitimate)$/),
+    });
+  });
+
+  it("returns 404 for a page it doesn't have", async () => {
+    expect((await get("/corpus/pages/no-such-page")).status).toBe(404);
+  });
+});
+
 describe("GET /corpus", () => {
   it("is readable without a token: it explains the demo, and spends nothing", async () => {
     expect((await get("/corpus")).status).toBe(200);
