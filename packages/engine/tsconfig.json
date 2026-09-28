@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM, Node or Workers types: fetch, timers and console don't exist here,
+    // so the engine cannot perform I/O even by accident.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src"]
+}

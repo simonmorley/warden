@@ -1,0 +1,14 @@
+{
+  "name": "@warden/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The permission engine: pure functions that decide whether a verdict may become an action.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
