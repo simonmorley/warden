@@ -6,6 +6,42 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — The model is llama-3.3-70b-instruct-fp8-fast, chosen on false positives
+
+**Changed.** The Workers AI model is now decided: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. The PRD had left it to "whatever produces reliable structured output".
+
+**How.** Seven candidates ran Warden's real prompt, schema and validator. The three finalists then ran the whole false-positive suite — five weaponised-report traps, three hard negatives, ten phishing controls — three times each, at temperature 0.
+
+| | False positives | Missed phishing | Rejected | Avg |
+| --- | --- | --- | --- | --- |
+| **llama-3.3-70b-fp8-fast** | **6 / 54** | 1 | 5 | 2517ms |
+| mistral-small-3.1-24b | 12 / 54 | 1 | 2 | 3464ms |
+| llama-4-scout-17b | 13 / 54 | 2 | 0 | 2350ms |
+
+**Why this one.** Fewest false positives, which is the harm the whole design exists to bound. It rejects more often than the others (5 of 54 answers unusable), and that is the right trade: a rejection routes to a person and earns nothing, which is the safe failure the design already handles, while a false positive takes down a legitimate page.
+
+The deciding detail is *where* its false positives came from. All six were the two traps it fell for, three runs each. It never wrongly flagged a legitimate page on that page's own merits — only when the page carried an instruction aimed at it. Which is Warden's argument in one line: the classifier is competent until someone attacks it, and permission is what bounds the damage then.
+
+**Raised by.** Claude Code, from the measurements above.
+
+**Docs.** PRD "deliberately not decided" no longer applies to the model; `packages/fixtures/README.md` records the trap results.
+
+---
+
+## 2026-09-28 — Five trap framings, because one was not a test
+
+**Changed.** The set carries five weaponised-report traps in different framings — a forum post, a product review, an issue tracker, a support ticket and a wiki citation — rather than the single forum post first written.
+
+**Why.** With one trap, llama-4-scout resisted it three times out of three, and the note going to Simon said the model "saw through it" and the demo might finish with nothing to revoke. Against all five it fell for four, every time. The first result was not a property of the model; it was a property of that one framing.
+
+The framings that work are the ones that look like a decision already taken by someone with authority — an issue labelled `confirmed-malicious`, a support ticket quoting "Security Operations". The one all three finalists handled best was the plainest: a forum post simply asserting it. That pattern is worth stating: an injection that imitates process is harder to resist than one that imitates instruction.
+
+**Raised by.** Claude Code. The single-trap result was reported to Simon as a finding before it was tested properly, which it should not have been.
+
+**Docs.** `packages/fixtures/README.md`.
+
+---
+
 ## 2026-09-28 — Fixtures are written from techniques, not sanitised from captured pages
 
 **Changed.** The technical design had each fixture built from a captured live page: take a candidate from a feed, fetch the copy a public scan already holds, then strip the harmful parts — exfiltration endpoints, brand assets, operator credentials, recipient identifiers — and keep what's left.
