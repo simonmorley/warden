@@ -69,23 +69,29 @@ Rejection paths — malformed responses, citations of signals that don't exist, 
 
 #### Where fixtures come from
 
-**Feeds find candidates; they never label.** Use phishing-focused sources — OpenPhish, PhishTank, Phishing Army, and public scans on urlscan.io. PhishTank's "verified" flag is a community vote, so it is another assertion, not a label. Feeds aggregate other feeds and community submissions, so treating one as ground truth is the vendor-asserted accuracy the PRD rejects in section 2. Don't use URLhaus or ThreatFox here; they track malware distribution and malware IOCs, not phishing pages.
+**They are written, not copied.** Every fixture is a schematic page: the smallest markup that carries one technique's structural signals, with fictional brands, reserved domains and no persuasive copy. None is a replica of a real phishing page.
 
-**Every label is set by a person.** Generated variants inherit their seed's label. No label comes from a feed.
+**Feeds and public scans inform the set; they never supply it.** Survey phishing-focused sources — OpenPhish, PhishTank, Phishing Army, public scans on urlscan.io — to learn which techniques are in circulation and how common each is. Read the aggregate, then close it and write the fixtures from the technique. Don't use URLhaus or ThreatFox here; they track malware distribution and malware IOCs, not phishing pages.
+
+What a survey is allowed to produce is a count per category, a list of techniques worth covering, and hashes. Not page content, not lure wording, not a field-by-field transcription. A captured page is read to answer "does this category exist, and how often", and is not kept.
+
+**Feeds never label, and neither does a survey.** A fixture's label is set by whoever wrote it, who knows what they built. Generated variants inherit their seed's label.
 
 **Per seed:**
 
-1. Pick a candidate.
-2. Capture the page. Prefer the DOM a public scan already holds over visiting the live site. If you must fetch, use a disposable isolated environment — never a logged-in browser, and never submit anything.
-3. Build a synthetic file carrying the same signals with the harmful parts removed: exfil endpoints pointed at `example.invalid`, brand assets replaced with fictional ones, operator credentials in the source (bot tokens, API keys) stripped, and target identifiers stripped — phishing URLs and forms often carry the recipient's email address.
+1. Take a technique from the survey: what the page asks for, where it sends it, how it is hosted.
+2. Write the smallest page that exhibits it — the fields, the form target, the script behaviour, the asset hosts.
+3. Check it against the safety rules below, which are enforced by an automated test.
 
-**Provenance per seed:** feed name, entry id, first-seen and capture dates, and SHA-256 of the original URL and of the captured page. Never record the live URL, not even defanged — it would break the safety check, and many are compromised legitimate sites. What ships is our file with known provenance, and it still works when the original is dead.
+**Provenance per seed** is the survey it came from and the technique it represents, not a document of origin: there is no original. A fixture is our own file, and it does not decay when some live page goes away.
 
-**Scale.** Hand-build 10 to 20 seeds covering distinct techniques, then generate the variants from them. Variants use fictional brands, reserved domains, and varied hosts, paths and obfuscation, and inherit their seed's provenance, label and campaign id.
+**Scale.** Hand-write 10 to 20 seeds covering distinct techniques, then generate the variants from them. Variants use fictional brands, reserved domains, and varied hosts, paths and obfuscation, and inherit their seed's label and campaign id.
 
 **Campaign siblings.** At least two positives share a technique while differing in domain, host and hash, because real campaigns occupy hundreds of near-identical domains. Siblings test whether the classifier recognises the technique or just the infrastructure. The campaign id also makes the independence limitation visible: deduplication counts siblings separately, so the dashboard can show how much of a track record came from a single campaign.
 
-**Hard negatives and benign pages can't come from phishing feeds.** Build them by hand from legitimate page patterns. A feed entry that turns out to be legitimate on inspection makes an excellent hard-negative seed — and the clearest illustration of why feeds don't label.
+**Hard negatives and benign pages** are written the same way, from legitimate page patterns: a real bank's sign-in page and a fake one share most of their structure, which is the whole difficulty.
+
+**What this costs.** A schematic page carries a technique's structure, not its craft. The set measures whether the classifier reads structure, and the demo measures the permission mechanism; neither measures accuracy against real traffic, and the PRD's limitations say so. See `packages/fixtures/README.md`.
 
 **Don't vendor any blocklist or feed into the repository.** Phishing Army is CC BY-NC; the others have their own terms.
 

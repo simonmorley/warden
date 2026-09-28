@@ -6,6 +6,27 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-28 — Fixtures are written from techniques, not sanitised from captured pages
+
+**Changed.** The technical design had each fixture built from a captured live page: take a candidate from a feed, fetch the copy a public scan already holds, then strip the harmful parts — exfiltration endpoints, brand assets, operator credentials, recipient identifiers — and keep what's left.
+
+Fixtures are now written from scratch. A survey of live pages says which techniques are in circulation and how common each is; the fixtures are then written to exhibit those techniques, as the smallest page that carries each one's structural signals. Captured pages are read for the aggregate and not kept.
+
+**Why.**
+
+- **Sanitising is subtractive, and subtractive is the wrong default for a public repository.** It starts from something harmful and removes what we thought of. What's left is still a working phishing page minus a list of known-bad parts, and a miss ships. Writing from a technique starts from nothing and adds only what a signal needs, so there is nothing to miss.
+- **The fixtures don't need the fidelity.** The classifier is given extracted signals and a bounded excerpt, never raw markup. A schematic page produces the same signals as a faithful copy, so the extra fidelity buys nothing the set is measuring.
+- **A public repository of replica phishing pages is a liability** whatever its intent: they get reported, mirrored and reused, and the provenance trail points at live compromised sites.
+- **What we actually wanted from live pages was the category list**, and a survey gives that. It produced the seed-phrase signal in the entry below, which is the one finding that changed the code.
+
+**What it costs.** A schematic page has a technique's structure but not its craft: no persuasive copy, no visual fidelity, none of the small touches that make a real lure work on a person. The set therefore exercises whether the classifier reads structure. It does not measure accuracy against real traffic — which the PRD's limitations already said, and which stays true.
+
+**Raised by.** The safety guardrails on Claude Code stopped the step that pulled field-by-field structure out of captured pages. That was the right call: on review, the sanitising approach was the weaker design, for the reasons above, and it took a refusal to notice. The captured pages were deleted at that point.
+
+**Docs.** Technical design §3C, and `packages/fixtures/README.md`.
+
+---
+
 ## 2026-09-28 — A signal for recovery-phrase requests, from a survey of live kits
 
 **Changed.** Signal extraction gains `seed_phrase_request`. It fires on a grid of 12 or more word fields, or on text asking for a recovery, seed or secret phrase.
