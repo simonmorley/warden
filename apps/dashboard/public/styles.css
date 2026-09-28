@@ -713,3 +713,166 @@ button.tab.current {
   margin: 0;
   font-size: 0.9rem;
 }
+
+/* The home page: a question, an answer, and the mechanism as a picture rather than prose. */
+.hero h2 {
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.hero .ask {
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  margin: 0.1rem 0 0.9rem;
+}
+
+.hero .answer {
+  font-size: 1.05rem;
+  margin: 0 0 1.75rem;
+  max-width: 48rem;
+}
+
+/* The whole design in one line: two gates up, one fall back down. */
+.ladder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ladder .rung {
+  flex: 1 1 13rem;
+  display: grid;
+  gap: 0.15rem;
+  align-content: start;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--shadow);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.ladder .rung.earning {
+  border-top-color: var(--earning);
+}
+
+.ladder .rung.autonomous {
+  border-top-color: var(--autonomous);
+}
+
+.rung-name {
+  font-weight: 700;
+}
+
+.ladder .rung.shadow .rung-name {
+  color: var(--shadow);
+}
+
+.ladder .rung.earning .rung-name {
+  color: var(--earning);
+}
+
+.ladder .rung.autonomous .rung-name {
+  color: var(--autonomous);
+}
+
+.rung-note {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* What it takes to climb one step. */
+.ladder .gate {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+  max-width: 7rem;
+}
+
+.ladder .gate span {
+  position: relative;
+  padding-top: 1.1rem;
+}
+
+.ladder .gate span::before {
+  content: "→";
+  position: absolute;
+  top: -0.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.hero .fall {
+  margin: 0.6rem 0 1.75rem;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--danger);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.hero .facts h3 {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 40rem) {
+  .ladder .gate {
+    max-width: none;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+  .ladder .gate span::before {
+    content: "↓";
+  }
+}
+
+/* Where a run has been, not only where it ended. */
+.journey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.4rem;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.step {
+  font-size: 0.8rem;
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.step.reached {
+  opacity: 1;
+  font-weight: 650;
+}
+
+.step.reached.EARNING {
+  color: var(--earning);
+}
+
+.step.reached.AUTONOMOUS {
+  color: var(--autonomous);
+}
+
+.journey .outcome {
+  font-size: 0.82rem;
+  color: var(--muted);
+}

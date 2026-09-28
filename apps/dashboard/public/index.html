@@ -24,45 +24,49 @@
     <p id="banner" class="banner" role="status" hidden></p>
 
     <main>
-      <section id="page-about" class="explainer" aria-labelledby="about-title">
-        <h2 id="about-title">What this is</h2>
-        <p class="lede">
-          An AI can tell you a page looks like phishing in a second. Deciding whether it may take that page down by
-          itself is the hard part. Warden makes it earn that permission from evidence, and take it away the moment it
-          gets one wrong.
+      <section id="page-about" class="hero" aria-labelledby="about-title">
+        <h2 id="about-title">An AI can spot a phishing page in a second.</h2>
+        <p class="ask">Should it be allowed to take that page down by itself?</p>
+        <p class="answer">
+          Warden's answer: <b>not until it has proved it</b> — and not for a moment longer than its first mistake.
         </p>
+
+        <ol class="ladder" aria-label="How permission is earned and lost">
+          <li class="rung shadow">
+            <span class="rung-name">Recommends only</span>
+            <span class="rung-note">Every verdict goes to a person.</span>
+          </li>
+          <li class="gate" aria-hidden="true"><span>73 confirmed correct</span></li>
+          <li class="rung earning">
+            <span class="rung-name">On trial</span>
+            <span class="rung-note">Strong enough — but not yet proved.</span>
+          </li>
+          <li class="gate" aria-hidden="true"><span>10 more in a row</span></li>
+          <li class="rung autonomous">
+            <span class="rung-name">Acts alone</span>
+            <span class="rung-note">Blocks a URL itself. Three at most await review.</span>
+          </li>
+        </ol>
+        <p class="fall">One wrong block and it falls all the way back — block undone, counting starts from zero.</p>
+
         <div class="facts">
           <div>
-            <h3>Nothing is being trained</h3>
-            <p>
-              The model and the prompt never change. There is no learning, no tuning, no feedback into the AI at all.
-              Warden only ever <em>measures</em> a fixed classifier and decides what it is allowed to do.
-            </p>
+            <h3>Nothing is trained</h3>
+            <p>The model and prompt never change. Warden measures a fixed classifier and decides what it may do.</p>
           </div>
           <div>
-            <h3>The verdict never authorises itself</h3>
-            <p>
-              The AI returns a verdict and the evidence behind it. Separate arithmetic it cannot influence decides
-              whether that becomes a block or goes to a person — so a page that fools the model still can't act.
-            </p>
+            <h3>A verdict can't authorise itself</h3>
+            <p>Arithmetic the AI cannot reach decides whether its verdict acts — so a page that fools it still can't.</p>
           </div>
           <div>
-            <h3>Permission is earned, then lost</h3>
-            <p>
-              It starts able only to recommend. Enough confirmed-correct calls and it may block a URL on its own. One
-              confirmed mistake on something it blocked and the permission is gone and the block is undone.
-            </p>
+            <h3>73 is not arbitrary</h3>
+            <p>Three right out of three is 100% and means nothing. 73 is where being certain enough actually starts.</p>
           </div>
         </div>
-        <ol class="states">
-          <li><b>Recommends only</b><span>Everything goes to a person. The record builds.</span></li>
-          <li><b>On trial</b><span>The evidence is strong enough, but it must hold for ten more calls.</span></li>
-          <li><b>Acts alone</b><span>It may block a URL itself — up to three awaiting review at once.</span></li>
-        </ol>
+
         <p class="note">
-          <b>Where to go from here.</b> <b>Send a page</b> puts one page through Warden and shows every step.
-          <b>Review</b> is where you confirm whether its verdicts were right — the only thing that moves its record.
-          <b>Demo run</b> plays the whole story out against a set of pages whose answers are already known.
+          <b>Send a page</b> puts one through and shows every step. <b>Review</b> is where you confirm verdicts.
+          <b>Demo run</b> plays the whole story out on pages whose answers are already known.
         </p>
       </section>
 
@@ -91,23 +95,11 @@
 
       <section id="page-review" hidden aria-labelledby="review-title">
         <div class="section-head">
-          <h2 id="review-title">Waiting for you</h2>
+          <h2 id="review-title">Review</h2>
           <button id="refresh-live" type="button" class="secondary">Refresh</button>
         </div>
         <p class="note">
-          Warden's verdicts mean nothing until a person confirms them — that confirmation is the only thing that moves
-          its record, up or down. Anything Warden blocked on its own comes first: those URLs are already down, and each
-          holds one of the three slots until it is reviewed.
-        </p>
-        <div id="queue" aria-live="polite"><p class="empty">Loading…</p></div>
-
-        <div class="section-head">
-          <h2>Warden's record here</h2>
-        </div>
-        <p class="note">
-          What Warden has earned on the pages you send it. This record is permanent and entirely separate from the
-          demo, and only a person's judgement counts in it — the demo's known answers can never touch it. It starts
-          empty, which is why Warden begins here with no permission to act.
+          Pages you send land here. Confirming a verdict is the only thing that moves Warden's record.
         </p>
         <div id="live" class="ledger"><p class="empty">Loading…</p></div>
       </section>

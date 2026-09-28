@@ -223,7 +223,7 @@ const views = new Map();
 
 /** Renders a record: run progress, summary tiles, events and the decision feed. Read-only —
  * judgements are given under Review, in one place rather than two. */
-function renderLedger(container, state) {
+function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
   const view = views.get(container.id) ?? (state.decisions.length > 20 ? "mattered" : "all");
@@ -232,7 +232,7 @@ function renderLedger(container, state) {
     ...standing(state),
     el("h3", {}, "What changed, and why"),
     eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, state.decisions.length > 0),
-    ...decisionFeed(state, view, container),
+    ...decisionFeed(state, view, container, onLabel),
   );
 }
 
@@ -241,6 +241,7 @@ function runProgress(run, state) {
   const parts = [
     el("span", { class: `status ${run.status}` }, runText(run)),
     el("progress", { value: run.next, max: run.total }),
+    journey(state),
     el("div", { class: "cost" }, costOf(state.decisions.length)),
   ];
   const rebuilding = run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
@@ -306,6 +307,40 @@ function standing(state) {
       ),
     ),
   ];
+}
+
+/**
+ * Where the run has been, not only where it ended.
+ *
+ * The arc finishes back at "recommends only" — permission is revoked near the end and the
+ * remaining pages start rebuilding. Anyone who looks only at the final state concludes it
+ * never worked, when in fact it earned autonomy, used it, and lost it exactly as designed.
+ */
+function journey(state) {
+  const reached = new Set(["SHADOW"]);
+  for (const recorded of state.events) {
+    if (recorded.event.kind === "promoted") reached.add(recorded.event.to);
+  }
+  const blocked = state.decisions.filter((decision) => decision.route.to === "block").length;
+  const revocations = state.events.filter((recorded) => recorded.event.kind === "revoked").length;
+  const undone = state.events.filter((recorded) => recorded.event.kind === "reversed").length;
+
+  const steps = [
+    ["SHADOW", "recommended only"],
+    ["EARNING", "went on trial"],
+    ["AUTONOMOUS", "acted alone"],
+  ].map(([key, label]) =>
+    el("span", { class: reached.has(key) ? `step reached ${key}` : "step" }, reached.has(key) ? `✓ ${label}` : label),
+  );
+
+  const outcome =
+    revocations > 0
+      ? `blocked ${blocked} URL${blocked === 1 ? "" : "s"} on its own, then lost the permission and undid ${undone}`
+      : blocked > 0
+        ? `blocked ${blocked} URL${blocked === 1 ? "" : "s"} on its own, permission intact`
+        : "never earned the right to act";
+
+  return el("div", { class: "journey" }, el("div", { class: "steps" }, steps), el("div", { class: "outcome" }, outcome));
 }
 
 /** The permission at a glance, in plain language, with the bound recomputed from its counts. */
@@ -406,7 +441,7 @@ function mattered(decision) {
 }
 
 /** The decision feed: heading, view switch, caption and table. */
-function decisionFeed(state, view, container) {
+function decisionFeed(state, view, container, onLabel) {
   const { decisions } = state;
   if (decisions.length === 0) return [el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")];
 
@@ -438,7 +473,7 @@ function decisionFeed(state, view, container) {
   if (shown.length === 0) {
     return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
   }
-  return [heading, caption, decisionTable(shown.slice().reverse())];
+  return [heading, caption, decisionTable(shown.slice().reverse(), onLabel)];
 }
 
 /** Explains what the current view shows, and where these pages came from. */
@@ -509,18 +544,18 @@ function campaignTable(decisions) {
 }
 
 /** The decision table, newest first. */
-function decisionTable(shown) {
+function decisionTable(shown, onLabel) {
   const head = el(
     "thead",
     {},
     el("tr", {}, ["Page", "Verdict", "Evidence cited", "Allowed to", "Block", "Confirmed"].map((t) => el("th", {}, t))),
   );
-  const body = el("tbody", {}, shown.map((decision) => feedRow(decision)));
+  const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
   return el("div", { class: "feed" }, el("table", {}, head, body));
 }
 
 /** One decision: what the page is, what the model said, and what it was allowed to do. */
-function feedRow(decision) {
+function feedRow(decision, onLabel) {
   return el(
     "tr",
     { "data-decision": decision.id },
@@ -529,7 +564,7 @@ function feedRow(decision) {
     el("td", {}, evidenceCell(decision)),
     el("td", {}, checkBadge(decision.route)),
     el("td", {}, blockCell(decision)),
-    el("td", {}, labelCell(decision)),
+    el("td", {}, labelCell(decision, onLabel)),
   );
 }
 
@@ -576,7 +611,7 @@ function blockCell(decision) {
 }
 
 /** The confirmed answer, or a note saying where to give one. */
-function labelCell(decision) {
+function labelCell(decision, onLabel) {
   if (decision.label) {
     const title =
       decision.label === "right"
@@ -584,7 +619,14 @@ function labelCell(decision) {
         : "Confirmed wrong: the verdict did not match what the page really is.";
     return el("span", { class: `label-${decision.label}`, title }, decision.label === "right" ? "verdict correct" : "verdict wrong");
   }
-  return el("span", { class: "muted", title: "Confirm it under Review — that is the only place a judgement is given." }, "waiting for you");
+  if (!onLabel) return el("span", { class: "muted" }, "not yet judged");
+  return el(
+    "div",
+    { class: "actions" },
+    el("button", { type: "button", class: "secondary", onclick: () => onLabel(decision.id, "right") }, "Correct"),
+    el("button", { type: "button", class: "secondary", onclick: () => onLabel(decision.id, "wrong") }, "Wrong"),
+    decision.counted ? null : el("div", { class: "muted", title: "Only a verdict of phishing counts towards the record." }, "won't move the record"),
+  );
 }
 
 // Demo runs.
@@ -627,96 +669,22 @@ $("run-demo").addEventListener("click", async () => {
 let lastLiveState = null;
 
 $("live").addEventListener("rerender", () => {
-  if (lastLiveState) renderLedger($("live"), lastLiveState);
+  if (lastLiveState) renderLedger($("live"), lastLiveState, { onLabel: labelLive });
 });
 
 /** Loads and shows the live ledger and the review queue. */
 async function loadLive() {
   const res = await api("GET", "/live");
   if (!res.ok) {
-    const message = el("p", { class: res.status === 503 ? "empty" : "error" }, explain(res));
-    $("live").replaceChildren(message);
-    $("queue").replaceChildren(message.cloneNode(true));
+    $("live").replaceChildren(el("p", { class: res.status === 503 ? "empty" : "error" }, explain(res)));
     return;
   }
   lastLiveState = res.data;
-  renderLedger($("live"), res.data);
-  renderQueue(res.data);
+  const waiting = res.data.decisions.filter((decision) => decision.label === null).length;
+  $("queue-count").textContent = waiting === 0 ? "" : String(waiting);
+  renderLedger($("live"), res.data, { onLabel: labelLive });
 }
 
-/**
- * What is waiting for a person. Blocks Warden made on its own come first: those URLs are
- * already down, and each holds one of the three slots until someone reviews it.
- */
-function renderQueue(state) {
-  const waiting = state.decisions.filter((decision) => decision.label === null);
-  const blocked = waiting.filter((decision) => decision.block === "active");
-  const rest = waiting.filter((decision) => decision.block !== "active");
-
-  $("queue-count").textContent = waiting.length === 0 ? "" : String(waiting.length);
-  if (waiting.length === 0) {
-    $("queue").replaceChildren(
-      el("p", { class: "empty" }, "Nothing waiting. Send Warden a page above and it will appear here for you to confirm."),
-    );
-    return;
-  }
-
-  const groups = [];
-  if (blocked.length > 0) {
-    groups.push(
-      el("h3", { class: "urgent" }, `Blocked without a person — ${blocked.length} of ${state.policy.maxUnreviewed} slots used`),
-      el("div", { class: "queue" }, blocked.slice().reverse().map((decision) => queueCard(decision, true))),
-    );
-  }
-  if (rest.length > 0) {
-    groups.push(
-      el("h3", {}, blocked.length > 0 ? "Recommended, waiting for you" : "Waiting for you"),
-      el("div", { class: "queue" }, rest.slice().reverse().slice(0, 25).map((decision) => queueCard(decision, false))),
-    );
-  }
-  $("queue").replaceChildren(...groups);
-}
-
-/** One thing to judge: what Warden said, what it did, and the two buttons that settle it. */
-function queueCard(decision, urgent) {
-  const page = corpus.byUrl.get(decision.url);
-  return el(
-    "article",
-    { class: urgent ? "card urgent" : "card" },
-    el("div", { class: "url", title: decision.url }, decision.url),
-    page ? el("div", { class: "technique" }, page.technique) : null,
-    el(
-      "div",
-      { class: "card-meta" },
-      el("span", { class: `verdict-${decision.verdict}` }, decision.verdict.replace("_", " ")),
-      " · ",
-      checkBadge(decision.route),
-      decision.citedSignals.length > 0 ? [" · ", decision.citedSignals.map((id) => el("span", { class: "chip" }, id))] : null,
-    ),
-    el(
-      "div",
-      { class: "card-ask" },
-      urgent ? "This URL is blocked right now. Was that right?" : "Was Warden's verdict right?",
-      decision.counted
-        ? null
-        : el(
-            "div",
-            { class: "muted" },
-            "Recorded either way, but this one won't move Warden's record: only a verdict of phishing counts towards it.",
-          ),
-    ),
-    el(
-      "div",
-      { class: "actions" },
-      el("button", { type: "button", onclick: () => labelLive(decision.id, "right") }, "Verdict was correct"),
-      el(
-        "button",
-        { type: "button", class: "secondary", onclick: () => labelLive(decision.id, "wrong") },
-        urgent ? "Wrong — undo the block" : "Verdict was wrong",
-      ),
-    ),
-  );
-}
 
 /** Records a person's judgement of a live decision, then reloads the ledger. */
 async function labelLive(decisionId, label) {
