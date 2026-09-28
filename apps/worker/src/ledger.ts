@@ -11,7 +11,8 @@ import {
   type Verdict,
 } from "@warden/engine";
 import { DurableObject } from "cloudflare:workers";
-import type { DemoStep } from "./demo";
+import { runBatch, START, type DemoLedger, type DemoStep, type RunProgress } from "./demo";
+import { modelFor } from "./model";
 
 /** A demo ledger takes fixture ground truth as its labels; the live ledger only takes a human's. */
 export type LedgerKind = "demo" | "live";
@@ -184,10 +185,25 @@ const SCHEMA = `
     decision_id TEXT NOT NULL REFERENCES decisions (id),
     detail TEXT NOT NULL,
     created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS runs (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    plan TEXT NOT NULL,
+    progress TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'done', 'failed')),
+    reason TEXT,
+    total INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
   )
 `;
 
+/** Pages classified at once in each batch of a demo run. */
+const BATCH_SIZE = 8;
+/** A moment's grace, so whoever started a run can see it before its first batch begins. */
+const FIRST_BATCH_DELAY_MS = 500;
+
 type LedgerRow = { kind: string; scope: string };
+type RunRow = { plan: string; progress: RunProgress; status: RunStatus["status"]; reason: string | null; total: number };
 type PermissionRow = {
   epoch: number;
   state: string;
@@ -210,12 +226,6 @@ export class Ledger extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
-    // Runs before any call is delivered, so nothing ever sees a half-made schema.
-    ctx.blockConcurrencyWhile(async () => {
-      for (const statement of SCHEMA.split(";")) {
-        if (statement.trim()) this.sql.exec(statement);
-      }
-    });
   }
 
   open(kind: LedgerKind, scope: Scope): OpenResult {
@@ -223,6 +233,11 @@ export class Ledger extends DurableObject<Env> {
     if (!ledger) {
       const permission = initialPermission();
       this.ctx.storage.transactionSync(() => {
+        // The schema is made only when a ledger is opened, never on a read: probing a
+        // run id that doesn't exist must not leave an empty object behind in storage.
+        for (const statement of SCHEMA.split(";")) {
+          if (statement.trim()) this.sql.exec(statement);
+        }
         this.sql.exec(
           "INSERT INTO ledger (id, kind, scope, created_at) VALUES (1, ?, ?, ?)",
           kind,
@@ -363,8 +378,50 @@ export class Ledger extends DurableObject<Env> {
     };
   }
 
-  startRun(_plan: readonly DemoStep[]): StartRunResult {
-    throw new Error("not implemented");
+  async startRun(plan: readonly DemoStep[]): Promise<StartRunResult> {
+    const ledger = this.ledgerRow();
+    if (!ledger) return { ok: false, error: "not_open" };
+    // Ground truth may only ever label a demo ledger.
+    if (ledger.kind !== "demo") return { ok: false, error: "not_a_demo_ledger" };
+    if (this.runRow()) return { ok: false, error: "already_started" };
+
+    this.sql.exec(
+      "INSERT INTO runs (id, plan, progress, status, total, created_at) VALUES (1, ?, ?, 'running', ?, ?)",
+      JSON.stringify(plan),
+      JSON.stringify(START),
+      plan.length,
+      Date.now(),
+    );
+    await this.ctx.storage.setAlarm(Date.now() + FIRST_BATCH_DELAY_MS);
+    return { ok: true, total: plan.length };
+  }
+
+  /** Each alarm runs one batch of the demo, saves where it got to, and books the next. */
+  override async alarm(): Promise<void> {
+    const ledger = this.ledgerRow();
+    const run = this.runRow();
+    if (!ledger || !run || run.status !== "running") return;
+
+    const scope = JSON.parse(ledger.scope) as Scope;
+    const model = modelFor(this.env);
+    if (!model) return this.failRun("no model is configured, so the run can't classify anything");
+    // A run can't switch models halfway: its permission is scoped to the one it started with.
+    if (model.id !== scope.modelId) {
+      return this.failRun(`the configured model is ${model.id}, but this run is scoped to ${scope.modelId}`);
+    }
+
+    try {
+      const plan = JSON.parse(run.plan) as DemoStep[];
+      const progress = await runBatch(this.asDemoLedger(), model, scope, plan, run.progress, BATCH_SIZE);
+      this.sql.exec(
+        "UPDATE runs SET progress = ?, status = ? WHERE id = 1",
+        JSON.stringify(progress),
+        progress.done ? "done" : "running",
+      );
+      if (!progress.done) await this.ctx.storage.setAlarm(Date.now());
+    } catch (error) {
+      this.failRun(error instanceof Error ? error.message : String(error));
+    }
   }
 
   state(): LedgerState | null {
@@ -406,6 +463,7 @@ export class Ledger extends DurableObject<Env> {
         createdAt: row.created_at,
       }));
 
+    const run = this.runRow();
     return {
       kind: ledger.kind as LedgerKind,
       scope: JSON.parse(ledger.scope) as Scope,
@@ -413,11 +471,43 @@ export class Ledger extends DurableObject<Env> {
       blocklist,
       decisions,
       events,
+      ...(run && { run: { status: run.status, next: run.progress.next, total: run.total, reason: run.reason } }),
     };
   }
 
   private ledgerRow(): LedgerRow | undefined {
+    const opened = this.sql.exec("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ledger'").toArray();
+    if (opened.length === 0) return undefined;
     return this.sql.exec<LedgerRow>("SELECT kind, scope FROM ledger WHERE id = 1").toArray()[0];
+  }
+
+  private runRow(): RunRow | undefined {
+    const row = this.sql
+      .exec<{ plan: string; progress: string; status: string; reason: string | null; total: number }>(
+        "SELECT plan, progress, status, reason, total FROM runs WHERE id = 1",
+      )
+      .toArray()[0];
+    if (!row) return undefined;
+    return {
+      plan: row.plan,
+      progress: JSON.parse(row.progress) as RunProgress,
+      status: row.status as RunStatus["status"],
+      reason: row.reason,
+      total: row.total,
+    };
+  }
+
+  private failRun(reason: string): void {
+    this.sql.exec("UPDATE runs SET status = 'failed', reason = ? WHERE id = 1", reason.slice(0, 300));
+  }
+
+  /** The ledger as the demo driver sees it: the same methods everything else uses. */
+  private asDemoLedger(): DemoLedger {
+    return {
+      epoch: async () => this.readPermission().epoch,
+      submit: async (input) => this.submit(input),
+      label: async (input) => this.label(input),
+    };
   }
 
   private readPermission(): Permission {

@@ -1,4 +1,5 @@
 import { createApp } from "./app";
+import { modelFor } from "./model";
 
 export { Ledger } from "./ledger";
 
@@ -7,8 +8,8 @@ export { Ledger } from "./ledger";
  * explicit and behaves the same in tests, `wrangler dev` and production.
  */
 export default createApp({
-  // The real Workers AI model is wired in once the account token has Workers AI permission.
-  model: () => null,
+  model: modelFor,
   liveLedgerName: (scopeHash) => `live:${scopeHash}`,
+  // Filled from the fixture set once its labels have been confirmed by a person.
   demoPlan: () => [],
 }) satisfies ExportedHandler<Env>;

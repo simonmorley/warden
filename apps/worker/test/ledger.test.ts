@@ -1,4 +1,4 @@
-import { env, evictDurableObject } from "cloudflare:test";
+import { env, evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import type { Scope, SubmitInput } from "../src/ledger";
 
@@ -208,6 +208,18 @@ describe("Ledger: losing permission", () => {
     const stale = await submitted(stub, phishing(101, { epochSeen: 1 }));
 
     expect(stale.route).toEqual({ to: "human", reason: "stale_epoch" });
+  });
+});
+
+describe("Ledger: probing", () => {
+  it("writes nothing when a ledger that was never opened is read, so probing run ids leaves no litter", async () => {
+    const stub = ledger();
+
+    expect(await stub.state()).toBeNull();
+    await runInDurableObject(stub, (_instance, state) => {
+      const tables = state.storage.sql.exec("SELECT name FROM sqlite_master WHERE type = 'table'").toArray();
+      expect(tables).toEqual([]);
+    });
   });
 });
 

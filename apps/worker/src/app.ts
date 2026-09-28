@@ -18,30 +18,42 @@ export interface Dependencies {
 interface Handler {
   /** Anything that changes state or spends inference needs the token (PRD 12). */
   readonly auth: boolean;
-  run(request: Request, env: Env, dependencies: Dependencies): Promise<Response>;
+  run(request: Request, env: Env, dependencies: Dependencies, params: readonly string[]): Promise<Response>;
+}
+
+interface Route {
+  readonly pattern: RegExp;
+  readonly handlers: Partial<Record<string, Handler>>;
 }
 
 const MAX_HTML = 1_000_000;
 const MAX_URL = 2_048;
 
-const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
-  "/classify": { POST: { auth: true, run: classifyPage } },
-  "/live": { GET: { auth: false, run: readLive } },
-  "/live/labels": { POST: { auth: true, run: labelLive } },
-};
+const ROUTES: readonly Route[] = [
+  { pattern: /^\/classify$/, handlers: { POST: { auth: true, run: classifyPage } } },
+  { pattern: /^\/live$/, handlers: { GET: { auth: false, run: readLive } } },
+  { pattern: /^\/live\/labels$/, handlers: { POST: { auth: true, run: labelLive } } },
+  { pattern: /^\/demo\/runs$/, handlers: { POST: { auth: true, run: startDemoRun } } },
+  { pattern: /^\/demo\/runs\/([^/]+)$/, handlers: { GET: { auth: false, run: watchDemoRun } } },
+];
+
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function createApp(dependencies: Dependencies) {
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
       const { pathname } = new URL(request.url);
-      const route = ROUTES[pathname];
+      const matched = ROUTES.map((candidate) => ({ candidate, match: candidate.pattern.exec(pathname) })).find(
+        ({ match }) => match !== null,
+      );
 
-      if (!route) {
+      if (!matched) {
         const asset = await env.ASSETS.fetch(request);
         if (asset.status !== 404) return asset;
         return problem(404, "not_found", `Nothing at ${request.method} ${pathname}`);
       }
 
+      const route = matched.candidate.handlers;
       const handler = route[request.method];
       if (!handler) {
         return problem(405, "method_not_allowed", `${pathname} doesn't accept ${request.method}.`, {
@@ -53,7 +65,7 @@ export function createApp(dependencies: Dependencies) {
       }
 
       try {
-        return await handler.run(request, env, dependencies);
+        return await handler.run(request, env, dependencies, matched.match!.slice(1));
       } catch (error) {
         if (error instanceof BadRequest) return problem(400, "bad_request", error.message);
         console.error("unhandled error", { pathname, error: String(error) });
@@ -122,6 +134,36 @@ async function labelLive(request: Request, env: Env, dependencies: Dependencies)
     return problem(409, "label_conflict", "This decision already has a different label, and labels are immutable.");
   }
   throw new Error(`the live ledger refused a label: ${result.error}`);
+}
+
+async function startDemoRun(_request: Request, env: Env, dependencies: Dependencies): Promise<Response> {
+  const model = dependencies.model(env);
+  if (!model) return noModel();
+  const plan = dependencies.demoPlan();
+  if (plan.length === 0) return problem(503, "no_demo_plan", "There are no fixtures to run a demo with yet.");
+
+  // Every run gets a fresh ledger of its own, so runs start clean and viewers can't collide.
+  const runId = crypto.randomUUID();
+  const scope = await currentScope(model.id);
+  const stub = env.LEDGER.get(env.LEDGER.idFromName(`demo:${runId}`));
+  const opened = await stub.open("demo", scope);
+  if (!opened.ok) throw new Error(`could not open a demo ledger: ${opened.error}`);
+  const started = await stub.startRun(plan);
+  if (!started.ok) throw new Error(`could not start a demo run: ${started.error}`);
+
+  return json({ runId, total: started.total, watch: `/demo/runs/${runId}` }, 202);
+}
+
+async function watchDemoRun(
+  _request: Request,
+  env: Env,
+  _dependencies: Dependencies,
+  [runId]: readonly string[],
+): Promise<Response> {
+  if (!runId || !RUN_ID.test(runId)) return problem(404, "not_found", "There is no such demo run.");
+  const state = await env.LEDGER.get(env.LEDGER.idFromName(`demo:${runId}`)).state();
+  if (!state || state.kind !== "demo") return problem(404, "not_found", "There is no such demo run.");
+  return json(state);
 }
 
 async function openLive(env: Env, dependencies: Dependencies, scope: Scope) {
