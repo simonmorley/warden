@@ -77,15 +77,48 @@
         <div id="try-result"></div>
       </section>
 
-      <section aria-labelledby="demo-title">
+      <div class="tabs" role="tablist" aria-label="Which record to show">
+        <button id="tab-submissions" type="button" role="tab" class="tab current" aria-selected="true" aria-controls="panel-submissions">
+          Pages you sent
+        </button>
+        <button id="tab-demo" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-demo">
+          Demo run
+        </button>
+      </div>
+
+      <section id="panel-submissions" role="tabpanel" aria-labelledby="tab-submissions">
         <div class="section-head">
-          <h2 id="demo-title">Watch it earn permission</h2>
+          <h2>Waiting for you</h2>
+          <span id="queue-count" class="queue-count"></span>
+        </div>
+        <p class="note">
+          Warden's verdicts mean nothing until a person confirms them — that confirmation is the only thing that moves
+          its record, up or down. Anything Warden blocked on its own comes first: those URLs are already down, and each
+          holds one of the three slots until it is reviewed.
+        </p>
+        <div id="queue" aria-live="polite"><p class="empty">Loading…</p></div>
+
+        <div class="section-head">
+          <h2>Warden's record here</h2>
+          <button id="refresh-live" type="button" class="secondary">Refresh</button>
+        </div>
+        <p class="note">
+          What Warden has earned on the pages you send it. This record is permanent and entirely separate from the
+          demo, and only a person's judgement counts in it — the demo's known answers can never touch it. It starts
+          empty, which is why Warden begins here with no permission to act.
+        </p>
+        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
+      </section>
+
+      <section id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+        <div class="section-head">
+          <h2>Watch it earn permission</h2>
           <button id="run-demo" type="button">Run the demo</button>
         </div>
         <p class="note">
-          The demo feeds Warden a few hundred pages whose real answer we already know, one after another, and confirms
-          each verdict against that answer — standing in for the analyst who would normally do it. Every verdict is a
-          live model call. Nothing is scripted, so the model can and does get some wrong.
+          The demo feeds Warden a set of pages whose real answer we already know, one after another, and confirms each
+          verdict against that answer — standing in for the analyst who would normally do it. Every verdict is a live
+          model call. Nothing is scripted, so the model can and does get some wrong.
         </p>
         <p class="note">
           Watch permission build as the evidence accumulates, then watch it disappear when a page carrying a planted
@@ -93,21 +126,6 @@
         </p>
         <div id="demo" class="ledger" aria-live="polite"><p class="empty">No run yet.</p></div>
       </section>
-
-      <section aria-labelledby="live-title">
-        <div class="section-head">
-          <h2 id="live-title">Live ledger</h2>
-          <button id="refresh-live" type="button" class="secondary">Refresh</button>
-        </div>
-        <p class="note">
-          Pages you send above land here. This ledger is permanent and separate from the demo, and only a person's
-          judgement counts in it — the demo's known answers can never touch it. It starts empty, which is why nothing
-          here has permission to act.
-        </p>
-        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
-      </section>
     </main>
-
-    <footer>A proof of concept on Cloudflare Workers. The design and its decision log are in the repository's docs folder.</footer>
   </body>
 </html>

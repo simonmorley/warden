@@ -1,7 +1,10 @@
 import type { Fixture } from "./types";
 
-/** Variants generated per phishing seed, which with the seeds themselves fills the demo run. */
-export const VARIANTS_PER_SEED = 21;
+/**
+ * Variants generated per phishing seed. Sized to the shortest run that still proves the
+ * point: enough pages to earn permission with headroom, and not one live model call more.
+ */
+export const VARIANTS_PER_SEED = 13;
 
 /**
  * A short deterministic token from a seed id and an index. Pure: the set must be identical

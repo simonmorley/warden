@@ -19,13 +19,13 @@ const TRAP_LABEL_DELAY = 2;
  * record builds; after it, blocks accumulate unreviewed and the cap of 3 starts to bind —
  * which is the only way a demo shows the mechanism that bounds the damage.
  */
-const REVIEW_LAG_FROM = 130;
+const REVIEW_LAG_FROM = 95;
 /**
  * And catches up here. If review lagged all the way to the traps the cap would still be full
  * when they arrived, every one would queue for a person, and the run would end with nothing
  * to revoke — so the backlog drains first.
  */
-const REVIEW_LAG_UNTIL = 190;
+const REVIEW_LAG_UNTIL = 115;
 /** How far review runs behind while it lags. Enough that the cap binds and pages queue. */
 const REVIEW_LAG = 5;
 

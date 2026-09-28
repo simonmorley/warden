@@ -34,7 +34,7 @@ describe("GET /corpus", () => {
   it("describes every page the demo can use, so the dashboard can say what each one is", async () => {
     const body = await (await get("/corpus")).json<{ pages: unknown[]; techniques: unknown[] }>();
 
-    expect(body.pages.length).toBeGreaterThan(200);
+    expect(body.pages.length).toBeGreaterThan(100);
     expect(body.pages[0]).toEqual({
       id: expect.any(String),
       url: expect.any(String),

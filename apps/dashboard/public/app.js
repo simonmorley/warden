@@ -224,13 +224,14 @@ const views = new Map();
 /** Renders a ledger: run progress, summary tiles, events and the decision feed. */
 function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
-  const view = views.get(container.id) ?? "mattered";
+  // A short record shows everything; only a long one needs filtering down to the story.
+  const view = views.get(container.id) ?? (state.decisions.length > 20 ? "mattered" : "all");
   container.replaceChildren(
     ...(state.run ? [runProgress(state.run, state)] : []),
     summaryTiles(state),
     el("p", { class: "hint" }, "Proven accuracy is recomputed in your browser from the counts above, using the server's own policy."),
     el("h3", {}, "What changed, and why"),
-    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container),
+    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, state.decisions.length > 0),
     ...decisionFeed(state, view, container, onLabel),
   );
 }
@@ -296,8 +297,16 @@ function summaryTiles({ permission, policy, blocklist }) {
 }
 
 /** Promotions, revocations and reversals, each linking to the decision that caused it. */
-function eventList(events, urlOf, container) {
-  if (events.length === 0) return el("p", { class: "empty" }, "Nothing has changed yet.");
+function eventList(events, urlOf, container, hasDecisions) {
+  if (events.length === 0) {
+    return el(
+      "p",
+      { class: "empty" },
+      hasDecisions
+        ? "Warden's permission hasn't moved yet. Only a confirmed judgement changes it, so confirm a verdict above and this fills in."
+        : "Nothing yet. This fills in as Warden gains or loses permission.",
+    );
+  }
   return el(
     "ul",
     { class: "events" },
@@ -351,10 +360,18 @@ function decisionFeed(state, view, container, onLabel) {
   const { decisions } = state;
   if (decisions.length === 0) return [el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")];
 
+  const showing =
+    view === "campaigns"
+      ? new Set(decisions.map((d) => corpus.byUrl.get(d.url)?.campaign ?? "unknown")).size
+      : (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
+  const label =
+    view === "campaigns"
+      ? `Decisions — ${showing} campaign${showing === 1 ? "" : "s"}, ${decisions.length} page${decisions.length === 1 ? "" : "s"}`
+      : `Decisions — showing ${showing} of ${decisions.length}`;
   const heading = el(
     "div",
     { class: "section-head" },
-    el("h3", {}, `Decisions (${decisions.length})`),
+    el("h3", {}, label),
     el(
       "div",
       { class: "views" },
@@ -569,12 +586,85 @@ $("live").addEventListener("rerender", () => {
   if (lastLiveState) renderLedger($("live"), lastLiveState, { onLabel: labelLive });
 });
 
-/** Loads and shows the live ledger, with buttons to confirm anything not yet judged. */
+/** Loads and shows the live ledger and the review queue. */
 async function loadLive() {
   const res = await api("GET", "/live");
-  if (!res.ok) return $("live").replaceChildren(el("p", { class: res.status === 503 ? "empty" : "error" }, explain(res)));
+  if (!res.ok) {
+    const message = el("p", { class: res.status === 503 ? "empty" : "error" }, explain(res));
+    $("live").replaceChildren(message);
+    $("queue").replaceChildren(message.cloneNode(true));
+    return;
+  }
   lastLiveState = res.data;
   renderLedger($("live"), res.data, { onLabel: labelLive });
+  renderQueue(res.data);
+}
+
+/**
+ * What is waiting for a person. Blocks Warden made on its own come first: those URLs are
+ * already down, and each holds one of the three slots until someone reviews it.
+ */
+function renderQueue(state) {
+  const waiting = state.decisions.filter((decision) => decision.label === null);
+  const blocked = waiting.filter((decision) => decision.block === "active");
+  const rest = waiting.filter((decision) => decision.block !== "active");
+
+  $("queue-count").textContent = waiting.length === 0 ? "" : `${waiting.length} waiting`;
+  if (waiting.length === 0) {
+    $("queue").replaceChildren(
+      el("p", { class: "empty" }, "Nothing waiting. Send Warden a page above and it will appear here for you to confirm."),
+    );
+    return;
+  }
+
+  const groups = [];
+  if (blocked.length > 0) {
+    groups.push(
+      el("h3", { class: "urgent" }, `Blocked without a person — ${blocked.length} of ${state.policy.maxUnreviewed} slots used`),
+      el("div", { class: "queue" }, blocked.slice().reverse().map((decision) => queueCard(decision, true))),
+    );
+  }
+  if (rest.length > 0) {
+    groups.push(
+      el("h3", {}, blocked.length > 0 ? "Recommended, waiting for you" : "Waiting for you"),
+      el("div", { class: "queue" }, rest.slice().reverse().slice(0, 25).map((decision) => queueCard(decision, false))),
+    );
+  }
+  $("queue").replaceChildren(...groups);
+}
+
+/** One thing to judge: what Warden said, what it did, and the two buttons that settle it. */
+function queueCard(decision, urgent) {
+  const page = corpus.byUrl.get(decision.url);
+  return el(
+    "article",
+    { class: urgent ? "card urgent" : "card" },
+    el("div", { class: "url", title: decision.url }, decision.url),
+    page ? el("div", { class: "technique" }, page.technique) : null,
+    el(
+      "div",
+      { class: "card-meta" },
+      el("span", { class: `verdict-${decision.verdict}` }, decision.verdict.replace("_", " ")),
+      " · ",
+      checkBadge(decision.route),
+      decision.citedSignals.length > 0 ? [" · ", decision.citedSignals.map((id) => el("span", { class: "chip" }, id))] : null,
+    ),
+    el(
+      "div",
+      { class: "card-ask" },
+      urgent ? "This URL is blocked right now. Was that right?" : "Was Warden's verdict right?",
+    ),
+    el(
+      "div",
+      { class: "actions" },
+      el("button", { type: "button", onclick: () => labelLive(decision.id, "right") }, "Verdict was correct"),
+      el(
+        "button",
+        { type: "button", class: "secondary", onclick: () => labelLive(decision.id, "wrong") },
+        urgent ? "Wrong — undo the block" : "Verdict was wrong",
+      ),
+    ),
+  );
 }
 
 /** Records a person's judgement of a live decision, then reloads the ledger. */
@@ -674,6 +764,24 @@ $("try-form").addEventListener("submit", async (event) => {
   $("try-result").replaceChildren(renderClassification(res.data));
   loadLive();
 });
+
+// Tabs: two records that would otherwise be two enormous blocks on one page.
+const TABS = [
+  ["tab-submissions", "panel-submissions"],
+  ["tab-demo", "panel-demo"],
+];
+
+/** Shows one tab's panel and hides the others. */
+function showTab(chosen) {
+  for (const [tab, panel] of TABS) {
+    const selected = tab === chosen;
+    $(tab).classList.toggle("current", selected);
+    $(tab).setAttribute("aria-selected", String(selected));
+    $(panel).hidden = !selected;
+  }
+}
+
+for (const [tab] of TABS) $(tab).addEventListener("click", () => showTab(tab));
 
 loadCorpus();
 loadLive();
