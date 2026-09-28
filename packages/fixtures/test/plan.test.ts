@@ -43,9 +43,18 @@ describe("the demo plan", () => {
     for (const trap of category("weaponised_report")) expect(trap.labelDelay).toBeGreaterThan(0);
   });
 
-  it("labels everything else as soon as it is decided", () => {
-    const others = plan.filter((step) => step.fixture.category !== "weaponised_report");
-    for (const step of others) expect(step.labelDelay).toBe(0);
+  it("labels the earning phase as soon as each page is decided, so the record builds quickly", () => {
+    const firstDelayed = plan.findIndex((step) => step.labelDelay > 0);
+    for (const step of plan.slice(0, firstDelayed)) expect(step.labelDelay).toBe(0);
+    // Promotion needs 83 counted-correct at best, so nothing may be held back before then.
+    expect(firstDelayed).toBeGreaterThan(90);
+  });
+
+  it("delays labels once permission is plausibly earned, so unreviewed blocks accumulate", () => {
+    // Otherwise every block is reviewed the moment it is made, the cap of 3 never binds,
+    // and the mechanism that bounds the damage is never seen working.
+    const delayed = plan.filter((step) => step.labelDelay > 0 && step.fixture.truth === "phishing");
+    expect(delayed.length).toBeGreaterThan(20);
   });
 
   it("keeps pages after the last trap, so a rejected retry has somewhere to show", () => {
