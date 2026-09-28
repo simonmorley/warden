@@ -1,0 +1,14 @@
+{
+  "name": "@warden/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The fixture set: synthetic page snapshots with hand-set labels, and the safety check every one must pass.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

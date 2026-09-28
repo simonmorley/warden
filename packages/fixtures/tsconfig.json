@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Pure like the engine: fixtures are data, and the safety check is a function over it.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src"]
+}
