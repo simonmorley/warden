@@ -1,3 +1,5 @@
+export { Ledger } from "./ledger";
+
 /**
  * Warden's Worker. Every request reaches this handler first (`run_worker_first`), so
  * routing is explicit and behaves the same in tests, `wrangler dev` and production.

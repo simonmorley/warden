@@ -14,5 +14,8 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
     "wrangler": "^4.143.0"
+  },
+  "dependencies": {
+    "@warden/engine": "*"
   }
 }

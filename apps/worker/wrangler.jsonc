@@ -13,6 +13,12 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
+  // One ledger per permission: each demo run gets its own, and the live ledger is its own.
+  // SQLite-backed, so a ledger's storage is a real database, locally and in production.
+  "durable_objects": {
+    "bindings": [{ "name": "LEDGER", "class_name": "Ledger" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Ledger"] }],
   "observability": {
     "enabled": true
   }
