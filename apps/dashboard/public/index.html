@@ -18,14 +18,78 @@
     <p id="banner" class="banner" role="status" hidden></p>
 
     <main>
+      <section class="explainer" aria-labelledby="about-title">
+        <h2 id="about-title">What this is</h2>
+        <p class="lede">
+          An AI can tell you a page looks like phishing in a second. Deciding whether it may take that page down by
+          itself is the hard part. Warden makes it earn that permission from evidence, and take it away the moment it
+          gets one wrong.
+        </p>
+        <div class="facts">
+          <div>
+            <h3>Nothing is being trained</h3>
+            <p>
+              The model and the prompt never change. There is no learning, no tuning, no feedback into the AI at all.
+              Warden only ever <em>measures</em> a fixed classifier and decides what it is allowed to do.
+            </p>
+          </div>
+          <div>
+            <h3>The verdict never authorises itself</h3>
+            <p>
+              The AI returns a verdict and the evidence behind it. Separate arithmetic it cannot influence decides
+              whether that becomes a block or goes to a person — so a page that fools the model still can't act.
+            </p>
+          </div>
+          <div>
+            <h3>Permission is earned, then lost</h3>
+            <p>
+              It starts able only to recommend. Enough confirmed-correct calls and it may block a URL on its own. One
+              confirmed mistake on something it blocked and the permission is gone and the block is undone.
+            </p>
+          </div>
+        </div>
+        <ol class="states">
+          <li><b>Recommends only</b><span>Everything goes to a person. The record builds.</span></li>
+          <li><b>On trial</b><span>The evidence is strong enough, but it must hold for ten more calls.</span></li>
+          <li><b>Acts alone</b><span>It may block a URL itself — up to three awaiting review at once.</span></li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="try-title">
+        <div class="section-head">
+          <h2 id="try-title">Send Warden a page</h2>
+        </div>
+        <p class="note">
+          Pick one of the test pages, or paste your own. You'll see every step: what was extracted from the page, what
+          the model said, whether its evidence checked out, and what it was allowed to do about it.
+        </p>
+        <form id="try-form" class="try">
+          <label for="try-pick">Test page</label>
+          <select id="try-pick">
+            <option value="">Choose a page to load…</option>
+          </select>
+          <label for="try-url">Reported URL</label>
+          <input id="try-url" type="url" required placeholder="https://login.northwind-bank.example/verify" />
+          <label for="try-html">Page source</label>
+          <textarea id="try-html" required rows="6" spellcheck="false" placeholder="<html>…</html>"></textarea>
+          <button type="submit">Classify this page</button>
+        </form>
+        <div id="try-result"></div>
+      </section>
+
       <section aria-labelledby="demo-title">
         <div class="section-head">
-          <h2 id="demo-title">Demo run</h2>
+          <h2 id="demo-title">Watch it earn permission</h2>
           <button id="run-demo" type="button">Run the demo</button>
         </div>
         <p class="note">
-          Every verdict is a live Workers AI call. Labels stand in for an analyst: each comes from the page's hand-set
-          ground truth, and says whether the model's verdict was right. Each run gets a fresh ledger.
+          The demo feeds Warden a few hundred pages whose real answer we already know, one after another, and confirms
+          each verdict against that answer — standing in for the analyst who would normally do it. Every verdict is a
+          live model call. Nothing is scripted, so the model can and does get some wrong.
+        </p>
+        <p class="note">
+          Watch permission build as the evidence accumulates, then watch it disappear when a page carrying a planted
+          instruction talks the model into blocking something legitimate.
         </p>
         <div id="demo" class="ledger" aria-live="polite"><p class="empty">No run yet.</p></div>
       </section>
@@ -35,24 +99,12 @@
           <h2 id="live-title">Live ledger</h2>
           <button id="refresh-live" type="button" class="secondary">Refresh</button>
         </div>
-        <p class="note">The permanent ledger for the current model, prompt and policy. Only a person's label counts here.</p>
-        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
-      </section>
-
-      <section aria-labelledby="try-title">
-        <h2 id="try-title">Try it live</h2>
         <p class="note">
-          Paste a page snapshot. It is classified on the spot, and joins the live ledger's queue for a person to label.
-          The page is only ever shown here as text.
+          Pages you send above land here. This ledger is permanent and separate from the demo, and only a person's
+          judgement counts in it — the demo's known answers can never touch it. It starts empty, which is why nothing
+          here has permission to act.
         </p>
-        <form id="try-form" class="try">
-          <label for="try-url">Reported URL</label>
-          <input id="try-url" type="url" required placeholder="https://login.northwind-bank.example/verify" />
-          <label for="try-html">Page HTML</label>
-          <textarea id="try-html" required rows="8" spellcheck="false" placeholder="<html>…</html>"></textarea>
-          <button type="submit">Classify</button>
-        </form>
-        <div id="try-result"></div>
+        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
       </section>
     </main>
 

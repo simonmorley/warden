@@ -87,6 +87,35 @@ function showBanner(text) {
   banner.hidden = !text;
 }
 
+// Every classification is a real model call that costs real money. Measured on this account:
+// 31,216 neurons over 1,153 calls with the configured model. Shown so the bill is never a
+// surprise, and flagged as the estimate it is.
+const NEURONS_PER_CALL = 27;
+const USD_PER_1K_NEURONS = 0.011;
+
+/** What a number of live model calls costs, roughly. */
+function costOf(calls) {
+  const neurons = calls * NEURONS_PER_CALL;
+  return `${calls} live model call${calls === 1 ? "" : "s"} · roughly ${neurons.toLocaleString()} neurons, about $${(
+    (neurons / 1000) *
+    USD_PER_1K_NEURONS
+  ).toFixed(2)}`;
+}
+
+// The corpus: what each test page actually is. Without it the decision feed is a list of
+// near-identical generated URLs with nothing to say what any of them is.
+const corpus = { byUrl: new Map(), summary: null, techniques: [] };
+
+/** Loads what the test pages are, and fills the picker. */
+async function loadCorpus() {
+  const res = await api("GET", "/corpus");
+  if (!res.ok) return;
+  corpus.summary = res.data.summary;
+  corpus.techniques = res.data.techniques;
+  for (const page of res.data.pages) corpus.byUrl.set(page.url, page);
+  fillPicker();
+}
+
 // The bound is recomputed here, in the browser, from the ledger's own counts and the
 // server's own policy: the arithmetic that grants permission is something anyone can check.
 
@@ -99,8 +128,8 @@ function wilson(right, n, z) {
   return Math.min(1, Math.max(0, lower));
 }
 
-/** How many more clean labels it takes for the bound to clear the bar. */
-function cleanLabelsToClear(right, wrong, policy) {
+/** How many more correct calls it takes before the proven accuracy reaches the bar. */
+function correctCallsStillNeeded(right, wrong, policy) {
   for (let more = 0; more <= 10_000; more++) {
     const bound = wilson(right + more, right + wrong + more, policy.z);
     if (bound !== null && bound >= policy.requiredScore) return more;
@@ -114,31 +143,49 @@ function pct(value) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-const REASONS = {
-  shadow: "SHADOW, so it only recommends",
-  earning: "EARNING, so it's on probation",
-  cap_full: "the cap is full: blocks await review",
-  stale_epoch: "stale: decided before a revocation",
-  rejected: "the response was rejected",
-  not_phishing: "the verdict was not phishing",
-  uncertain: "the verdict was uncertain",
-  duplicate: "the page was already decided",
+/** What each permission state means, without the vocabulary. */
+const STATES = {
+  SHADOW: { label: "Recommends only", detail: "Everything goes to a person. Nothing is blocked automatically." },
+  EARNING: { label: "On trial", detail: "The evidence is strong enough, but it must hold before it may act." },
+  AUTONOMOUS: { label: "Acts alone", detail: "It may block a URL by itself, within the limits shown." },
 };
 
-/** What the permission check did with a decision, in words. */
-function routeText(route) {
-  if (route.to === "block") return "blocked automatically";
-  return `to a person: ${REASONS[route.reason] ?? route.reason}`;
+/** Why a decision went to a person instead of being acted on: short badge, sentence on hover. */
+const REASONS = {
+  shadow: ["recommends only", "Warden could only recommend: it had not earned permission to act."],
+  earning: ["on trial", "Warden was on trial: the evidence held, but it had not finished proving itself."],
+  cap_full: ["cap full", "Three automatic blocks were already awaiting review, so everything else waits for a person."],
+  stale_epoch: ["permission changed", "Permission was revoked while this page was being classified, so the verdict could not act."],
+  rejected: ["answer rejected", "The model's answer failed validation, so it earned nothing and went to a person."],
+  not_phishing: ["said legitimate", "The model said this page is not phishing, so there was nothing to act on."],
+  uncertain: ["said unsure", "The model would not commit either way, so a person decides."],
+  duplicate: ["already seen", "This page had already been decided here, so it counts once."],
+};
+
+/** What the permission check did with a decision. */
+function checkBadge(route) {
+  if (route.to === "block") {
+    return el("span", { class: "badge blocked", title: "Warden blocked this URL on its own, with no person involved." }, "blocked");
+  }
+  const [short, full] = REASONS[route.reason] ?? [route.reason, route.reason];
+  return el("span", { class: "badge", title: full }, short);
 }
 
 /** One summary tile. */
 function tile(label, value, sub, extra) {
-  return el("div", { class: "tile" }, el("div", { class: "label" }, label), el("div", { class: "value" }, value), sub ? el("div", { class: "sub" }, sub) : null, extra ?? null);
+  return el(
+    "div",
+    { class: "tile" },
+    el("div", { class: "label" }, label),
+    el("div", { class: "value" }, value),
+    sub ? el("div", { class: "sub" }, sub) : null,
+    extra ?? null,
+  );
 }
 
 /** The numbers an event was decided on. */
 function tally(t) {
-  return `${t.right} right of ${t.right + t.wrong} · lower bound ${pct(t.bound)} · epoch ${t.epoch}`;
+  return `${t.right} correct of ${t.right + t.wrong} · proven accuracy ${pct(t.bound)}`;
 }
 
 /** An event as a headline and the receipt behind it. */
@@ -146,15 +193,18 @@ function describe(recorded, urlOf) {
   const { event } = recorded;
   switch (event.kind) {
     case "promoted":
-      return [`Promoted ${event.from} → ${event.to}`, tally(event.tally)];
+      return [`Permission raised: ${STATES[event.from].label} → ${STATES[event.to].label}`, tally(event.tally)];
     case "demoted":
-      return [`Dropped ${event.from} → SHADOW. Same epoch, nothing reversed.`, tally(event.tally)];
+      return ["Permission lowered: back to recommending only", tally(event.tally)];
     case "probation_restarted":
-      return ["Probation restarted after a mistake; the bar still holds.", tally(event.tally)];
+      return ["Trial restarted after a wrong call; the evidence still holds.", tally(event.tally)];
     case "revoked":
-      return [`Permission revoked: epoch ${event.tally.epoch} → ${event.nextEpoch}, counters reset.`, `record when revoked: ${tally(event.tally)}`];
+      return [
+        "Permission revoked — it blocked something legitimate, so counting starts again from zero",
+        `record at that moment: ${tally(event.tally)} · attempt ${event.tally.epoch} → ${event.nextEpoch}`,
+      ];
     case "reversed":
-      return [`Block reversed: ${urlOf(recorded.decisionId)}`, `authorised in epoch ${event.blockEpoch}`];
+      return [`Block undone: ${urlOf(recorded.decisionId)}`, "the page was legitimate, so the block was removed"];
     default:
       return [event.kind, ""];
   }
@@ -163,96 +213,289 @@ function describe(recorded, urlOf) {
 /** A demo run's progress in words. */
 function runText(run) {
   if (run.status === "running") return `Running: page ${run.next} of ${run.total}`;
-  if (run.status === "done") return `Done: all ${run.total} pages decided`;
+  if (run.status === "done") return `Finished: all ${run.total} pages classified`;
   return `Stopped after ${run.next} of ${run.total} pages: ${run.reason}`;
 }
+
+// Which slice of the decision feed to show. "What mattered" is the default because the set
+// is mostly campaign siblings: near-identical pages that nearly all go the same way.
+const views = new Map();
 
 /** Renders a ledger: run progress, summary tiles, events and the decision feed. */
 function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
+  const view = views.get(container.id) ?? "mattered";
   container.replaceChildren(
-    ...(state.run ? [runProgress(state.run)] : []),
+    ...(state.run ? [runProgress(state.run, state)] : []),
     summaryTiles(state),
-    el("p", { class: "hint" }, "The lower bound is recomputed in your browser from the counts above, with the server's policy."),
+    el("p", { class: "hint" }, "Proven accuracy is recomputed in your browser from the counts above, using the server's own policy."),
     el("h3", {}, "What changed, and why"),
-    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL"),
-    ...decisionFeed(state.decisions, onLabel),
+    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container),
+    ...decisionFeed(state, view, container, onLabel),
   );
 }
 
-/** A demo run's status line and progress bar. */
-function runProgress(run) {
-  return el("div", { class: "run" }, el("span", { class: `status ${run.status}` }, runText(run)), el("progress", { value: run.next, max: run.total }));
+/** A demo run's status line, what it cost, and what its end state means. */
+function runProgress(run, state) {
+  const parts = [
+    el("span", { class: `status ${run.status}` }, runText(run)),
+    el("progress", { value: run.next, max: run.total }),
+    el("div", { class: "cost" }, costOf(state.decisions.length)),
+  ];
+  const rebuilding = run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
+  if (rebuilding) {
+    parts.push(
+      el(
+        "p",
+        { class: "hint" },
+        `This run ended part-way through starting over, which is why it finishes at "recommends only". ` +
+          `Permission was revoked on attempt ${state.permission.epoch - 1}, and the remaining pages began rebuilding ` +
+          `the record from zero. That is the design working, not the run failing.`,
+      ),
+    );
+  }
+  return el("div", { class: "run" }, ...parts);
 }
 
-/** The permission at a glance, with the bound recomputed from its counts. */
+/** The permission at a glance, in plain language, with the bound recomputed from its counts. */
 function summaryTiles({ permission, policy, blocklist }) {
   const n = permission.right + permission.wrong;
   const bound = wilson(permission.right, n, policy.z);
-  const toClear = cleanLabelsToClear(permission.right, permission.wrong, policy);
-  const blocked = `${blocklist.length} URL${blocklist.length === 1 ? "" : "s"} blocked now`;
+  const stillNeeded = correctCallsStillNeeded(permission.right, permission.wrong, policy);
+  const state = STATES[permission.state];
+  const attempt =
+    permission.epoch > 1 ? `attempt ${permission.epoch} — permission has been revoked ${permission.epoch - 1}×` : "first attempt";
+
   return el(
     "div",
     { class: "tiles" },
-    tile("Permission", el("span", { class: `state ${permission.state}` }, permission.state), `epoch ${permission.epoch}`),
-    tile("Lower bound", pct(bound), `bar ${pct(policy.requiredScore)} · z = ${policy.z}`, el("progress", { value: bound ?? 0, max: 1 })),
-    tile("Track record", `${permission.right} / ${n}`, `${permission.wrong} wrong this epoch`),
-    tile("To clear the bar", permission.state === "SHADOW" && toClear !== null ? `${toClear} more` : "cleared", "clean labels needed"),
-    tile("Probation", permission.state === "EARNING" ? `${permission.probation} / ${policy.probationLength}` : "—", "correct checks in a row"),
-    tile("Unreviewed blocks", `${permission.unreviewed} / ${policy.maxUnreviewed}`, blocked),
+    tile("Can it act alone?", el("span", { class: `state ${permission.state}`, title: state.detail }, state.label), attempt),
+    tile(
+      "Accuracy we can prove",
+      pct(bound),
+      `needs ${pct(policy.requiredScore)} — the worst its true accuracy could plausibly be, not its average`,
+      el("progress", { value: bound ?? 0, max: 1 }),
+    ),
+    tile("Confirmed correct", `${permission.right} of ${n}`, `${permission.wrong} wrong since the last reset`),
+    tile(
+      "Still needed",
+      permission.state === "SHADOW" && stillNeeded !== null ? `${stillNeeded} more` : "none",
+      "correct calls before it could be trusted to act",
+    ),
+    tile(
+      "Trial progress",
+      permission.state === "EARNING" ? `${permission.probation} of ${policy.probationLength}` : "—",
+      "correct in a row before it may act alone",
+    ),
+    tile(
+      "Blocks awaiting review",
+      `${permission.unreviewed} of ${policy.maxUnreviewed}`,
+      `${blocklist.length} URL${blocklist.length === 1 ? "" : "s"} blocked right now`,
+    ),
   );
 }
 
-/** Promotions, demotions, revocations and reversals, each with its receipt. */
-function eventList(events, urlOf) {
-  if (events.length === 0) return el("p", { class: "empty" }, "No promotions, revocations or reversals yet.");
+/** Promotions, revocations and reversals, each linking to the decision that caused it. */
+function eventList(events, urlOf, container) {
+  if (events.length === 0) return el("p", { class: "empty" }, "Nothing has changed yet.");
   return el(
     "ul",
     { class: "events" },
     events.map((recorded) => {
       const [headline, receipt] = describe(recorded, urlOf);
-      return el("li", { class: recorded.event.kind }, headline, el("span", { class: "receipt" }, receipt));
+      return el(
+        "li",
+        { class: recorded.event.kind },
+        el(
+          "button",
+          {
+            type: "button",
+            class: "event-link",
+            title: "Show the decision that caused this",
+            onclick: () => revealDecision(container, recorded.decisionId),
+          },
+          headline,
+        ),
+        el("span", { class: "receipt" }, receipt),
+      );
     }),
   );
 }
 
-/** The decision feed's heading and table, newest first. */
-function decisionFeed(decisions, onLabel) {
-  const shown = decisions.slice(-80).reverse();
-  const more = decisions.length > shown.length ? ` (latest ${shown.length} of ${decisions.length})` : "";
-  const heading = el("h3", {}, `Decisions${more}`);
-  if (shown.length === 0) return [heading, el("p", { class: "empty" }, "Nothing decided yet.")];
-
-  const head = el("thead", {}, el("tr", {}, ["URL", "Verdict", "Evidence", "Permission check", "Block", "Label"].map((title) => el("th", {}, title))));
-  const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
-  return [heading, el("div", { class: "feed" }, el("table", {}, head, body))];
+/** Switches to the full feed and highlights one decision, so an event can be traced to its cause. */
+function revealDecision(container, decisionId) {
+  views.set(container.id, "all");
+  container.dispatchEvent(new CustomEvent("rerender"));
+  requestAnimationFrame(() => {
+    const row = container.querySelector(`[data-decision="${CSS.escape(decisionId)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.classList.add("highlight");
+  });
 }
 
-/** One decision: what the model said, what it cited, what the permission check did, and how it was labelled. */
+/** Whether a decision is worth a reviewer's attention, rather than one more of the same. */
+function mattered(decision) {
+  if (!decision.valid) return true;
+  if (decision.verdict === "uncertain") return true;
+  if (decision.label === "wrong") return true;
+  if (decision.block === "reversed") return true;
+  if (decision.route.to === "human" && ["cap_full", "stale_epoch", "duplicate"].includes(decision.route.reason)) return true;
+  // A page blocked automatically and confirmed right, or recommended and confirmed right, is
+  // the system working as expected — hundreds of those, and not one of them is news.
+  return false;
+}
+
+/** The decision feed: heading, view switch, caption and table. */
+function decisionFeed(state, view, container, onLabel) {
+  const { decisions } = state;
+  if (decisions.length === 0) return [el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")];
+
+  const heading = el(
+    "div",
+    { class: "section-head" },
+    el("h3", {}, `Decisions (${decisions.length})`),
+    el(
+      "div",
+      { class: "views" },
+      viewButton("mattered", "What mattered", view, container),
+      viewButton("campaigns", "By campaign", view, container),
+      viewButton("all", "Everything", view, container),
+    ),
+  );
+  const caption = el("p", { class: "note" }, captionFor(view, state));
+
+  if (view === "campaigns") return [heading, caption, campaignTable(decisions)];
+
+  const shown = view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120);
+  if (shown.length === 0) {
+    return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
+  }
+  return [heading, caption, decisionTable(shown.slice().reverse(), onLabel)];
+}
+
+/** Explains what the current view shows, and where these pages came from. */
+function captionFor(view, state) {
+  const built = corpus.summary
+    ? `These are ${corpus.summary.pages} pages written for this project — ${corpus.summary.techniques} hand-written techniques, expanded into ${corpus.summary.campaigns} campaigns of near-identical pages on different domains, the way a real phishing kit is deployed across many hosts. None is a copy of a real page.`
+    : "";
+  if (view === "campaigns") return `${built} Grouped by campaign, since siblings share a technique and nearly always go the same way.`;
+  if (view === "all") return `${built} Every decision, newest first.`;
+  const hidden = state.decisions.length - state.decisions.filter(mattered).length;
+  return `${built} Showing only what a reviewer would want: mistakes, rejected answers, pages Warden refused to act on, and blocks that were undone. ${hidden} routine calls are hidden.`;
+}
+
+/** One of the three view switches. */
+function viewButton(id, label, current, container) {
+  return el(
+    "button",
+    {
+      type: "button",
+      class: id === current ? "view current" : "view",
+      onclick: () => {
+        views.set(container.id, id);
+        container.dispatchEvent(new CustomEvent("rerender"));
+      },
+    },
+    label,
+  );
+}
+
+/** One row per campaign: the padding collapsed into counts. */
+function campaignTable(decisions) {
+  const families = new Map();
+  for (const decision of decisions) {
+    const page = corpus.byUrl.get(decision.url);
+    const key = page?.campaign ?? "unknown";
+    const family = families.get(key) ?? { key, technique: page?.technique ?? "—", pages: 0, right: 0, wrong: 0, blocked: 0, unusable: 0 };
+    family.pages++;
+    if (decision.label === "right") family.right++;
+    if (decision.label === "wrong") family.wrong++;
+    if (decision.route.to === "block") family.blocked++;
+    if (!decision.valid || decision.verdict === "uncertain") family.unusable++;
+    families.set(key, family);
+  }
+
+  const head = el(
+    "thead",
+    {},
+    el("tr", {}, ["Campaign", "Technique", "Pages", "Correct", "Wrong", "Blocked", "Unusable"].map((t) => el("th", {}, t))),
+  );
+  const body = el(
+    "tbody",
+    {},
+    [...families.values()].map((family) =>
+      el(
+        "tr",
+        {},
+        el("td", {}, family.key),
+        el("td", { class: "muted" }, family.technique),
+        el("td", {}, String(family.pages)),
+        el("td", { class: "label-right" }, String(family.right)),
+        el("td", { class: family.wrong > 0 ? "label-wrong" : "muted" }, String(family.wrong)),
+        el("td", {}, String(family.blocked)),
+        el("td", { class: "muted" }, String(family.unusable)),
+      ),
+    ),
+  );
+  return el("div", { class: "feed" }, el("table", {}, head, body));
+}
+
+/** The decision table, newest first. */
+function decisionTable(shown, onLabel) {
+  const head = el(
+    "thead",
+    {},
+    el("tr", {}, ["Page", "Verdict", "Evidence cited", "Allowed to", "Block", "Confirmed"].map((t) => el("th", {}, t))),
+  );
+  const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
+  return el("div", { class: "feed" }, el("table", {}, head, body));
+}
+
+/** One decision: what the page is, what the model said, and what it was allowed to do. */
 function feedRow(decision, onLabel) {
   return el(
     "tr",
-    {},
-    el("td", { class: "url", title: decision.url }, decision.url),
+    { "data-decision": decision.id },
+    el("td", {}, pageCell(decision)),
     el("td", {}, verdictCell(decision)),
     el("td", {}, evidenceCell(decision)),
-    el("td", {}, decision.route.to === "block" ? el("span", { class: "blocked" }, routeText(decision.route)) : routeText(decision.route)),
+    el("td", {}, checkBadge(decision.route)),
     el("td", {}, blockCell(decision)),
     el("td", {}, labelCell(decision, onLabel)),
   );
+}
+
+/** What the page is, with its URL underneath. A known test page says what it really is. */
+function pageCell(decision) {
+  const page = corpus.byUrl.get(decision.url);
+  const url = el("div", { class: "url", title: decision.url }, decision.url);
+  if (!page) return url;
+  const truth = el(
+    "span",
+    { class: page.truth === "phishing" ? "truth-phishing" : "truth-legitimate" },
+    page.truth === "phishing" ? "really phishing" : "really legitimate",
+  );
+  return [el("div", { class: "technique" }, page.technique), truth, url];
 }
 
 /** The verdict, with the model's own stated confidence shown as just that. */
 function verdictCell(decision) {
   const verdict = el("span", { class: `verdict-${decision.verdict}` }, decision.verdict.replace("_", " "));
   if (decision.confidence === null) return verdict;
-  const stated = el("div", { class: "muted", title: "As the model stated it. Recorded, never used to decide anything." }, `says ${Math.round(decision.confidence * 100)}%`);
+  const stated = el(
+    "div",
+    { class: "muted", title: "The model's own stated confidence. Recorded, but it decides nothing." },
+    `it claims ${Math.round(decision.confidence * 100)}%`,
+  );
   return [verdict, stated];
 }
 
-/** The signals a verdict cited, or why its response was rejected. */
+/** The signals a verdict cited, or why its answer was rejected. */
 function evidenceCell(decision) {
-  if (!decision.valid) return el("span", { class: "rejected" }, `rejected: ${decision.rejection}`);
+  if (!decision.valid) {
+    return el("span", { class: "rejected", title: "The answer failed validation, so it earned nothing." }, `rejected: ${decision.rejection}`);
+  }
   if (decision.citedSignals.length === 0) return el("span", { class: "muted" }, "none cited");
   return decision.citedSignals.map((id) => el("span", { class: "chip" }, id));
 }
@@ -260,23 +503,36 @@ function evidenceCell(decision) {
 /** Whether the decision's block still stands. */
 function blockCell(decision) {
   if (!decision.block) return el("span", { class: "muted" }, "—");
-  return el("span", { class: `block-${decision.block}` }, decision.block);
+  const title =
+    decision.block === "reversed" ? "This block was undone after the page turned out to be legitimate." : "This URL is blocked.";
+  return el("span", { class: `block-${decision.block}`, title }, decision.block === "reversed" ? "undone" : "in place");
 }
 
-/** The label, or buttons to set one where a person may label. */
+/** The confirmed answer, or buttons to give one where a person may. */
 function labelCell(decision, onLabel) {
-  if (decision.label) return el("span", { class: `label-${decision.label}` }, decision.label);
-  if (!onLabel) return el("span", { class: "muted" }, "—");
+  if (decision.label) {
+    const title =
+      decision.label === "right"
+        ? "Confirmed: the verdict matched what the page really is."
+        : "Confirmed wrong: the verdict did not match what the page really is.";
+    return el("span", { class: `label-${decision.label}`, title }, decision.label === "right" ? "verdict correct" : "verdict wrong");
+  }
+  if (!onLabel) return el("span", { class: "muted" }, "not yet judged");
   return el(
     "div",
     { class: "actions" },
-    el("button", { type: "button", class: "secondary", title: "The verdict was right", onclick: () => onLabel(decision.id, "right") }, "Right"),
+    el("button", { type: "button", class: "secondary", title: "The verdict was right", onclick: () => onLabel(decision.id, "right") }, "Correct"),
     el("button", { type: "button", class: "secondary", title: "The verdict was wrong", onclick: () => onLabel(decision.id, "wrong") }, "Wrong"),
   );
 }
 
 // Demo runs.
 let demoTimer;
+let lastDemoState = null;
+
+$("demo").addEventListener("rerender", () => {
+  if (lastDemoState) renderLedger($("demo"), lastDemoState);
+});
 
 /** Shows a demo run and keeps polling it while it runs. */
 async function watchDemo(runId) {
@@ -284,10 +540,11 @@ async function watchDemo(runId) {
   const res = await api("GET", `/demo/runs/${encodeURIComponent(runId)}`);
   if (!res.ok) return demoUnavailable(res);
 
+  lastDemoState = res.data;
   renderLedger($("demo"), res.data);
   const running = res.data.run?.status === "running";
   $("run-demo").disabled = running;
-  if (running) demoTimer = setTimeout(() => watchDemo(runId), 1000);
+  if (running) demoTimer = setTimeout(() => watchDemo(runId), 1500);
 }
 
 /** Explains why a demo run can't be shown, and forgets a run the server doesn't know. */
@@ -306,15 +563,21 @@ $("run-demo").addEventListener("click", async () => {
 });
 
 // The live ledger.
+let lastLiveState = null;
 
-/** Loads and shows the live ledger, with label buttons on anything unlabelled. */
+$("live").addEventListener("rerender", () => {
+  if (lastLiveState) renderLedger($("live"), lastLiveState, { onLabel: labelLive });
+});
+
+/** Loads and shows the live ledger, with buttons to confirm anything not yet judged. */
 async function loadLive() {
   const res = await api("GET", "/live");
   if (!res.ok) return $("live").replaceChildren(el("p", { class: res.status === 503 ? "empty" : "error" }, explain(res)));
+  lastLiveState = res.data;
   renderLedger($("live"), res.data, { onLabel: labelLive });
 }
 
-/** Applies a person's label to a live decision, then reloads the ledger. */
+/** Records a person's judgement of a live decision, then reloads the ledger. */
 async function labelLive(decisionId, label) {
   const res = await api("POST", "/live/labels", { decisionId, label });
   showBanner(res.ok ? "" : explain(res));
@@ -323,31 +586,73 @@ async function labelLive(decisionId, label) {
 
 $("refresh-live").addEventListener("click", loadLive);
 
-// Try it live.
+// Sending Warden a page.
+
+/** Fills the picker with one page per technique, so nobody has to invent HTML. */
+function fillPicker() {
+  const picker = $("try-pick");
+  if (!picker || corpus.techniques.length === 0) return;
+  picker.append(...corpus.techniques.map((page) => el("option", { value: page.id }, `${page.technique} — really ${page.truth}`)));
+}
+
+$("try-pick").addEventListener("change", async (event) => {
+  const chosen = corpus.techniques.find((page) => page.id === event.target.value);
+  if (!chosen) return;
+  const res = await api("GET", `/corpus/pages/${encodeURIComponent(chosen.id)}`);
+  if (!res.ok) return showBanner(explain(res));
+  $("try-url").value = res.data.url;
+  $("try-html").value = res.data.html;
+  $("try-result").replaceChildren();
+});
 
 /** A definition-list row. */
 function row(term, ...definition) {
   return [el("dt", {}, term), el("dd", {}, ...definition)];
 }
 
-/** Shows what came back from classifying a pasted page. */
+/** What happened to a page, step by step, so the flow is visible rather than implied. */
 function renderClassification(d) {
-  const excerpt = d.excerpt.length > 400 ? `${d.excerpt.slice(0, 400)}…` : d.excerpt;
-  const stated = d.confidence === null ? "" : ` (the model says ${Math.round(d.confidence * 100)}%)`;
+  const excerpt = d.excerpt.length > 300 ? `${d.excerpt.slice(0, 300)}…` : d.excerpt;
+  const stated = d.confidence === null ? "" : ` — it claims ${Math.round(d.confidence * 100)}% confidence, which decides nothing`;
+  const step = (n, title, ...body) =>
+    el("li", {}, el("div", { class: "step-title" }, `${n}. ${title}`), el("div", { class: "step-body" }, ...body));
+
   return el(
     "div",
     { class: "result" },
     el(
-      "dl",
-      {},
-      row("Verdict", el("span", { class: `verdict-${d.verdict ?? "none"}` }, d.verdict ?? "none"), stated),
-      row("Validation", d.valid ? "passed" : el("span", { class: "rejected" }, `rejected: ${d.rejection}`)),
-      row("Evidence cited", chips(d.citedSignals.map((id) => ({ id })))),
-      row("Permission check", routeText(d.route)),
-      row("Reasoning", d.reasoning ?? el("span", { class: "muted" }, "none")),
-      row("Signals found", chips(d.signals)),
-      row("Page text seen", el("span", { class: "muted" }, excerpt)),
+      "ol",
+      { class: "pipeline" },
+      step(
+        "1",
+        "Signals extracted from the page",
+        chips(d.signals),
+        el("div", { class: "muted" }, `plus ${d.excerpt.length} characters of its text, given to the model as data, never as instructions`),
+      ),
+      step(
+        "2",
+        "The model gave a verdict",
+        el("span", { class: `verdict-${d.verdict ?? "none"}` }, d.verdict ?? "none"),
+        stated,
+        d.reasoning ? el("div", { class: "muted" }, d.reasoning) : null,
+      ),
+      step(
+        "3",
+        "Its evidence was checked against the page",
+        d.valid
+          ? el("span", {}, "every signal it cited was really found: ", chips(d.citedSignals.map((id) => ({ id }))))
+          : el("span", { class: "rejected" }, `rejected — ${d.rejection}. It earns nothing and goes to a person.`),
+      ),
+      step(
+        "4",
+        "Permission was checked",
+        checkBadge(d.route),
+        " ",
+        el("span", { class: "muted" }, (REASONS[d.route.reason] ?? [])[1] ?? "Warden blocked this URL on its own."),
+      ),
+      step("5", "Recorded in the live ledger", "It now waits for a person to confirm the verdict. Only that moves the record."),
     ),
+    el("dl", {}, row("Page text the model saw", el("span", { class: "muted" }, excerpt))),
   );
 }
 
@@ -361,6 +666,7 @@ $("try-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const submit = event.submitter ?? $("try-form").querySelector("button");
   submit.disabled = true;
+  $("try-result").replaceChildren(el("p", { class: "empty" }, "Classifying — this is a live model call…"));
   const res = await api("POST", "/classify", { url: $("try-url").value, html: $("try-html").value });
   submit.disabled = false;
 
@@ -369,7 +675,8 @@ $("try-form").addEventListener("submit", async (event) => {
   loadLive();
 });
 
+loadCorpus();
 loadLive();
-setInterval(loadLive, 10_000);
+setInterval(loadLive, 15_000);
 const lastRun = stored(RUN_KEY);
 if (lastRun) watchDemo(lastRun);

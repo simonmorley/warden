@@ -1,4 +1,5 @@
 import { DEFAULT_POLICY } from "@warden/engine";
+import { ALL_FIXTURES, SEEDS } from "@warden/fixtures";
 import { pageIdentity } from "@warden/signals";
 import { authorised, BadRequest, json, problem, readObject, requireString, runningLocally } from "./http";
 import type { DemoStep } from "./demo";
@@ -34,6 +35,8 @@ const ROUTES: readonly Route[] = [
   { pattern: /^\/classify$/, handlers: { POST: { auth: true, run: classifyPage } } },
   { pattern: /^\/live$/, handlers: { GET: { auth: false, run: readLive } } },
   { pattern: /^\/live\/labels$/, handlers: { POST: { auth: true, run: labelLive } } },
+  { pattern: /^\/corpus$/, handlers: { GET: { auth: false, run: readCorpus } } },
+  { pattern: /^\/corpus\/pages\/([^/]+)$/, handlers: { GET: { auth: false, run: readCorpusPage } } },
   { pattern: /^\/demo\/runs$/, handlers: { POST: { auth: true, run: startDemoRun } } },
   { pattern: /^\/demo\/runs\/([^/]+)$/, handlers: { GET: { auth: false, run: watchDemoRun } } },
 ];
@@ -132,6 +135,62 @@ async function labelLive(request: Request, env: Env, dependencies: Dependencies)
     return problem(409, "label_conflict", "This decision already has a different label, and labels are immutable.");
   }
   throw new Error(`the live ledger refused a label: ${result.error}`);
+}
+
+/**
+ * The pages a demo run walks, and how the set is built. Read-only and unauthenticated: it
+ * spends nothing, and without it the decision feed is a list of near-identical URLs with
+ * nothing to say what any of them is.
+ */
+async function readCorpus(): Promise<Response> {
+  const pages = ALL_FIXTURES.map((fixture) => ({
+    id: fixture.id,
+    url: fixture.url,
+    truth: fixture.truth,
+    category: fixture.category,
+    campaign: fixture.campaign,
+    technique: fixture.provenance?.technique ?? fixture.category,
+    // A generated sibling names the seed it came from; a seed names itself.
+    seed: fixture.seed ?? fixture.id,
+  }));
+
+  return json({
+    pages,
+    // One entry per hand-written page, so a picker can offer one of each kind.
+    techniques: SEEDS.map((seed) => ({
+      id: seed.id,
+      url: seed.url,
+      truth: seed.truth,
+      category: seed.category,
+      technique: seed.provenance?.technique ?? seed.category,
+    })),
+    summary: {
+      pages: pages.length,
+      phishing: pages.filter((page) => page.truth === "phishing").length,
+      legitimate: pages.filter((page) => page.truth === "legitimate").length,
+      techniques: SEEDS.length,
+      campaigns: new Set(pages.map((page) => page.campaign)).size,
+    },
+  });
+}
+
+/** One test page's source, so the dashboard can offer it without anyone writing HTML. */
+async function readCorpusPage(
+  _request: Request,
+  _env: Env,
+  _dependencies: Dependencies,
+  [id]: readonly string[],
+): Promise<Response> {
+  const page = ALL_FIXTURES.find((fixture) => fixture.id === id);
+  if (!page) return problem(404, "not_found", "There is no such test page.");
+  return json({
+    id: page.id,
+    url: page.url,
+    html: page.html,
+    truth: page.truth,
+    category: page.category,
+    technique: page.provenance?.technique ?? page.category,
+  });
 }
 
 async function startDemoRun(_request: Request, env: Env, dependencies: Dependencies): Promise<Response> {

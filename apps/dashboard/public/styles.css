@@ -410,3 +410,193 @@ footer {
   font-size: 0.8rem;
   text-align: center;
 }
+
+/* What this is: the explainer that has to land before any number on the page means anything. */
+.explainer .lede {
+  font-size: 1.05rem;
+  margin: 0 0 1.25rem;
+  max-width: 62rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.facts h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+}
+
+.facts p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.states {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: state;
+}
+
+.states li {
+  counter-increment: state;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.states li::before {
+  content: counter(state);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-right: 0.45rem;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.states b {
+  font-size: 0.95rem;
+}
+
+.states span {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Switching how much of the decision feed to show. */
+.views {
+  display: flex;
+  gap: 0.35rem;
+}
+
+button.view {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+button.view.current {
+  background: var(--chip);
+  color: var(--ink);
+  border-color: var(--accent);
+  font-weight: 650;
+}
+
+/* What the permission check did: a badge, with the full sentence on hover. */
+.badge {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.badge.blocked {
+  border-color: var(--danger);
+  color: var(--danger);
+  font-weight: 650;
+}
+
+/* What a test page actually is, above its generated URL. */
+.technique {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.truth-phishing,
+.truth-legitimate {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.truth-phishing {
+  color: var(--danger);
+}
+
+.truth-legitimate {
+  color: var(--autonomous);
+}
+
+/* An event links to the decision that caused it. */
+button.event-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+button.event-link:hover {
+  text-decoration-color: currentColor;
+}
+
+tr.highlight td {
+  background: var(--chip);
+}
+
+/* What happened to one page, step by step. */
+.pipeline {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.pipeline li {
+  border-left: 3px solid var(--accent);
+  padding: 0.3rem 0 0.3rem 0.75rem;
+}
+
+.step-title {
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+
+.step-body {
+  margin-top: 0.2rem;
+  font-size: 0.88rem;
+}
+
+/* Every classification is real money; say so rather than leave it to be discovered. */
+.cost {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+}
