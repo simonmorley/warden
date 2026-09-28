@@ -934,3 +934,14 @@ button.tab.current {
   font-size: 0.88rem;
   color: var(--muted);
 }
+
+/* Warden reads the source, not the URL: catch the two disagreeing before a verdict is made. */
+.mismatch {
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--earning);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
+  color: var(--earning);
+  font-size: 0.85rem;
+}

@@ -743,6 +743,10 @@ function fillPicker() {
   picker.append(...corpus.techniques.map((page) => el("option", { value: page.id }, `${page.technique} — really ${page.truth}`)));
 }
 
+// Where the source in the box came from, so an edited URL with somebody else's HTML still
+// sitting underneath it can be caught before it produces a verdict about the wrong page.
+let loadedPage = null;
+
 $("try-pick").addEventListener("change", async (event) => {
   const chosen = corpus.techniques.find((page) => page.id === event.target.value);
   if (!chosen) return;
@@ -750,7 +754,32 @@ $("try-pick").addEventListener("change", async (event) => {
   if (!res.ok) return showBanner(explain(res));
   $("try-url").value = res.data.url;
   $("try-html").value = res.data.html;
+  loadedPage = { url: res.data.url, html: res.data.html };
   $("try-result").replaceChildren();
+  checkMismatch();
+});
+
+/**
+ * Warns when the URL has been changed but the loaded page source has not. Warden judges the
+ * source, so that combination silently produces a verdict about a completely different page.
+ */
+function checkMismatch() {
+  const stale = loadedPage !== null && $("try-html").value === loadedPage.html && $("try-url").value !== loadedPage.url;
+  const warning = $("try-mismatch");
+  warning.hidden = !stale;
+  if (stale) {
+    warning.textContent =
+      "The page source below is still the test page you loaded, but the URL has changed. Warden reads the source, so it would judge the loaded page and label it with your URL. Paste the real source, or pick a test page again.";
+  }
+}
+
+$("try-url").addEventListener("input", () => {
+  $("try-pick").value = "";
+  checkMismatch();
+});
+$("try-html").addEventListener("input", () => {
+  loadedPage = null;
+  checkMismatch();
 });
 
 /** A definition-list row. */

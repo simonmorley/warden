@@ -96,19 +96,20 @@
           <h2 id="try-title">Send Warden a page</h2>
         </div>
         <p class="note">
-          Pick one of the test pages, or paste your own. You'll see every step: what was extracted from the page, what
-          the model said, whether its evidence checked out, and what it was allowed to do about it. Then confirm the
-          verdict under <b>Review</b>.
+          <b>Warden never visits the URL.</b> It judges the page source you give it, and the URL only for what it
+          says — the host, the path, anything hidden in the query. That is deliberate: it keeps every run repeatable,
+          and it keeps a live phishing site from being fetched by the thing meant to judge it.
         </p>
         <form id="try-form" class="try">
-          <label for="try-pick">Test page</label>
+          <label for="try-pick">Load a test page</label>
           <select id="try-pick">
-            <option value="">Choose a page to load…</option>
+            <option value="">Choose one…</option>
           </select>
           <label for="try-url">Reported URL</label>
           <input id="try-url" type="url" required placeholder="https://login.northwind-bank.example/verify" />
-          <label for="try-html">Page source</label>
-          <textarea id="try-html" required rows="6" spellcheck="false" placeholder="<html>…</html>"></textarea>
+          <label for="try-html">Page source <span class="muted">— what Warden actually reads</span></label>
+          <textarea id="try-html" required rows="6" spellcheck="false" placeholder="Paste the page's HTML here, or load a test page above."></textarea>
+          <p id="try-mismatch" class="mismatch" hidden></p>
           <button type="submit">Classify this page</button>
         </form>
         <div id="try-result"></div>
