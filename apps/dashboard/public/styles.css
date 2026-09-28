@@ -1105,3 +1105,12 @@ details#try-advanced[open] summary {
 .next-step span {
   font-size: 0.85rem;
 }
+
+/* Both vocabularies, once, so the demo's colours and the design docs map to each other. */
+.rung-key {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  opacity: 0.75;
+}

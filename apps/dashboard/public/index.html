@@ -19,9 +19,9 @@
       </div>
       <nav class="nav" aria-label="Sections">
         <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
+        <button id="nav-demo" type="button" class="tab">Demo run</button>
         <button id="nav-try" type="button" class="tab">Send a page</button>
         <button id="nav-review" type="button" class="tab">Review <span id="queue-count" class="queue-count"></span></button>
-        <button id="nav-demo" type="button" class="tab">Demo run</button>
       </nav>
     </header>
 
@@ -32,22 +32,22 @@
         <h2 id="about-title">An AI can spot a phishing page in a second.</h2>
         <p class="ask">Should it be allowed to take that page down by itself?</p>
         <p class="answer">
-          Warden's answer: <b>not until it has proved it</b> — and not for a moment longer than its first mistake.
+          Warden's answer: <b>not until it has proved it</b> — and only until one of its blocks turns out to be wrong.
         </p>
 
         <ol class="ladder" aria-label="How permission is earned and lost">
           <li class="rung shadow">
-            <span class="rung-name">Recommends only</span>
+            <span class="rung-name">Recommends only <span class="rung-key">SHADOW</span></span>
             <span class="rung-note">Every verdict goes to a person.</span>
           </li>
           <li class="gate" aria-hidden="true"><span>73 confirmed correct</span></li>
           <li class="rung earning">
-            <span class="rung-name">On trial</span>
+            <span class="rung-name">On trial <span class="rung-key">EARNING</span></span>
             <span class="rung-note">Strong enough — but not yet proved.</span>
           </li>
           <li class="gate" aria-hidden="true"><span>10 more in a row</span></li>
           <li class="rung autonomous">
-            <span class="rung-name">Acts alone</span>
+            <span class="rung-name">Acts alone <span class="rung-key">AUTONOMOUS</span></span>
             <span class="rung-note">Blocks a URL itself. Three at most await review.</span>
           </li>
         </ol>
@@ -60,7 +60,7 @@
           </div>
           <div>
             <h3>A verdict can't authorise itself</h3>
-            <p>Arithmetic the AI cannot reach decides whether its verdict acts — so a page that fools it still can't.</p>
+            <p>Whether a verdict acts is decided by arithmetic the model cannot reach. A page that fools the classifier still doesn't get a block.</p>
           </div>
           <div>
             <h3>73 is not arbitrary</h3>
@@ -73,7 +73,7 @@
           <li>
             <b>Demo run</b>
             <span>
-              Start here. Two minutes, about 150 pages whose real answers are already known. Watch Warden earn the
+              Start here — it is the first tab, and tells the whole story on its own. Two to three minutes, <span class="corpus-size">a set of</span> pages whose real answers are already known. Watch Warden earn the
               right to act, use it, then lose it to a page that tricks it. Nothing is scripted — every verdict is a
               live model call.
             </span>
@@ -149,7 +149,7 @@
           <b>Review</b>. Nothing here grants or removes any permission that outlives the run.
         </p>
         <p class="note">
-          About 150 pages whose real answers are already known, fed through one after another, each verdict confirmed
+          <span class="corpus-size">A set of</span> pages whose real answers are already known, fed through one after another, each verdict confirmed
           against that answer — standing in for the analyst who would normally do it. Every verdict is a live model
           call, so nothing is scripted and the model does get some wrong. Takes two to three minutes; you can leave
           and come back, and refreshing keeps your place.

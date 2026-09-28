@@ -18,7 +18,7 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 **Raised by.** Simon submitted his own URL, got a verdict about a test page whose source was still in the box, and asked whether the HTML was really needed.
 
-**Docs.** PRD §9 and §13; technical design §3F.
+**Docs.** PRD §9 (browser rendering is what remains out), §12 (what bounds the fetch) and §13; technical design §3F.
 
 ---
 

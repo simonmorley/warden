@@ -221,7 +221,8 @@ There is a fair criticism of the gate, and it isn't that it should be learned. I
 **Out, and why:**
 
 - **Real takedowns and external enforcement.** The permission mechanism is what's being tested, and a takedown integration exercises none of it. It would also make the actions irreversible, and reversal is half the argument.
-- **Live URL fetching and browser rendering.** Stored snapshots keep the inputs identical between runs, so any difference in outcome comes from the model rather than the pages, and they keep live phishing out of the build.
+- **Browser rendering.** Warden fetches a reported URL and reads the HTML as served. It runs no scripts, so a page assembled by JavaScript looks empty to it, and a kit that serves benign content to datacentre addresses shows it something harmless. Browser Rendering answers both, and is the obvious next step.
+- **Live pages in the demo.** The demo runs on a fixed set, so any difference between runs comes from the model rather than the pages, and no live phishing is fetched to produce one.
 - **Other abuse types.** Not a config entry. Each needs its own track record and its own evidence that the AI is any good at it.
 - **Drift detection, calibration, campaign clustering.** Each is a second way to revoke permission, and each needs its own evidence before it earns that power.
 
@@ -273,6 +274,17 @@ The page is written by the attacker. Treat everything from it as hostile.
 - Require a strict response schema. Reject anything that doesn't match.
 - Check that every signal id the model cites exists in the extracted signals.
 - Render page content in the dashboard as escaped text. Never execute it.
+**Fetching a reported URL.** The URL comes from whoever reported it, so it is hostile input rather than an address, and a Worker that fetches one is a request-forgery surface. What bounds it:
+
+- HTTPS only, and credentials in the URL are refused — they would otherwise be sent to whatever it resolved to.
+- Nothing aimed at loopback, a private range, link-local metadata, or a name that resolves inside.
+- That check runs again at every redirect hop, not only the first, because a public URL can redirect inwards.
+- Three hops at most; anything longer is abandoned.
+- Non-HTML is refused rather than read as markup, and the body is read up to a cap instead of whole.
+- Every refusal is named, so a caller learns what happened rather than receiving a blank page.
+
+The platform helps but is not the argument: a Worker has no route into a private network without a Tunnel, and these guards hold whether or not that remains true.
+
 - Require a token on every endpoint that changes state or spends inference — starting a demo run and classifying a page both cost real model calls. A Worker running on someone's own machine is exempt, which `.dev.vars` signals and no deployment can: a clone works immediately, and anything reachable by others is always guarded.
 - Compare the token in constant time.
 - Serve the dashboard under a strict Content-Security-Policy.
@@ -286,7 +298,7 @@ The page is written by the attacker. Treat everything from it as hostile.
 
 ## 13. The demo
 
-One button. Every verdict is a live Workers AI call against the fixture set — nothing is recorded or replayed. Labels stand in for an analyst, taken from each page's hand-set ground truth, and the screen says so. Each run gets a fresh ledger, so runs don't interfere and there is nothing to reset.
+One button. Every verdict is a live Workers AI call against the fixture set — nothing is recorded or replayed. Labels stand in for an analyst, taken from each page's hand-set ground truth, and the screen says so. Each run gets a fresh ledger, so runs don't interfere and a run needs no reset. The live ledger has one, for the demonstration rather than the mechanism: without it a few experiments pollute it permanently and the next viewer inherits them.
 
 Inference runs concurrently ahead of the ledger while submissions stay in fixture order, which keeps a run to a few minutes.
 

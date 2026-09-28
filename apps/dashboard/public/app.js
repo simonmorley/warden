@@ -117,6 +117,7 @@ async function loadCorpus() {
   corpus.summary = res.data.summary;
   corpus.techniques = res.data.techniques;
   for (const page of res.data.pages) corpus.byUrl.set(page.url, page);
+  for (const slot of document.querySelectorAll(".corpus-size")) slot.textContent = String(corpus.summary.pages);
   fillPicker();
 }
 
@@ -339,7 +340,7 @@ function standing(state) {
       el(
         "p",
         { class: "muted" },
-        `Starting from nothing, ${needed} confirmed-correct phishing verdicts are needed before Warden could be trusted to act alone. That is the point of the bar, and why the demo exists.`,
+        `Starting from nothing, ${needed} confirmed-correct phishing verdicts clear the bar, and ${policy.probationLength} more in a row after that before Warden may act alone. That is the point of the bar, and why the demo exists.`,
       ),
     ),
   ];
