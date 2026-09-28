@@ -15,8 +15,9 @@ export function authorise(permission: Permission, submission: Submission, policy
     permission,
   });
 
-  if (submission.verdict !== "phishing") return toHuman(submission.verdict);
+  // Validity first: a response that failed validation has no verdict worth reporting.
   if (!submission.valid) return toHuman("rejected");
+  if (submission.verdict !== "phishing") return toHuman(submission.verdict);
   if (submission.duplicate) return toHuman("duplicate");
 
   // Checked before state so that a request raced by a revocation says so (PRD 7.2).
