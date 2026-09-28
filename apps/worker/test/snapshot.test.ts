@@ -33,6 +33,24 @@ describe("fetchSnapshot", () => {
     expect(result).toMatchObject({ ok: false, reason: "unsupported_url" });
   });
 
+  it("allows a URL naming this very Worker, which is not an attempt to reach somewhere private", async () => {
+    const result = await fetchSnapshot("http://localhost:8788/corpus/pages/x/source", {
+      fetcher: serving(PAGE, { type: "text/plain" }),
+      selfOrigin: "http://localhost:8788",
+    });
+
+    expect(result).toMatchObject({ ok: true, html: PAGE });
+  });
+
+  it("allows only that origin, not anything else on the same machine", async () => {
+    const result = await fetchSnapshot("http://localhost:9999/admin", {
+      fetcher: serving(PAGE),
+      selfOrigin: "http://localhost:8788",
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "not_public" });
+  });
+
   it.each([
     ["loopback", "https://127.0.0.1/admin"],
     ["localhost by name", "https://localhost/admin"],
