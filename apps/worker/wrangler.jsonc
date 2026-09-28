@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "warden",
+  "main": "src/index.ts",
+  // The test pool bundles an older runtime (workerd 2026-08-15) than `wrangler dev`,
+  // so the date stays at or below what both support.
+  "compatibility_date": "2026-08-15",
+  // The dashboard is plain static files. The Worker sees every request first and serves
+  // them through the ASSETS binding, so routing and security headers are the same in
+  // tests, `wrangler dev` and production.
+  "assets": {
+    "directory": "../dashboard/public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "observability": {
+    "enabled": true
+  }
+}

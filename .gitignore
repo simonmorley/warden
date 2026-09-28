@@ -1,0 +1,27 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Wrangler local state, including each ledger's local SQLite files
+.wrangler/
+
+# Secrets: real values live in .dev.vars locally and `wrangler secret put` in production
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Local-only assistant settings
+.claude/settings.local.json
+
+# Private material never belongs in this public repository
+private/
+*.pdf

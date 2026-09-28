@@ -1,0 +1,24 @@
+{
+  "name": "warden",
+  "private": true,
+  "type": "module",
+  "description": "Phishing triage where the AI has to earn the right to act.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @warden/worker",
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run typecheck && npm test",
+    "deploy": "npm run deploy -w @warden/worker"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

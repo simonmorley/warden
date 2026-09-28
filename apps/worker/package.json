@@ -1,0 +1,18 @@
+{
+  "name": "@warden/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Worker: HTTP surface, ledger Durable Objects, inference adapter and demo driver.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "wrangler": "^4.143.0"
+  }
+}

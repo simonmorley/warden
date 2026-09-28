@@ -1,0 +1,6 @@
+{
+  "name": "@warden/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The dashboard: static files served by the Worker as static assets."
+}
