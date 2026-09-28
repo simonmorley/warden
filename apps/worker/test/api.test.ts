@@ -25,7 +25,7 @@ const phishing = answering({
 // Each app gets its own live ledger, so tests' histories can't mix.
 const appWith = (model: Model | null) => {
   const name = `live:${crypto.randomUUID()}`;
-  return createApp({ model: () => model, liveLedgerName: () => name });
+  return createApp({ model: () => model, liveLedgerName: () => name, demoPlan: () => [] });
 };
 const testEnv = { ...env, WARDEN_TOKEN: TOKEN };
 

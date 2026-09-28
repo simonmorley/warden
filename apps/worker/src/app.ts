@@ -1,5 +1,6 @@
 import { pageIdentity } from "@warden/signals";
 import { authorised, BadRequest, json, problem, readObject, requireString } from "./http";
+import type { DemoStep } from "./demo";
 import type { Model } from "./inference/classify";
 import type { Scope } from "./ledger";
 import { decide, type LedgerPort } from "./pipeline";
@@ -10,6 +11,8 @@ export interface Dependencies {
   model(env: Env): Model | null;
   /** The live ledger's Durable Object name for a scope. */
   liveLedgerName(scopeHash: string): string;
+  /** The pages a demo run walks through, in order. */
+  demoPlan(): readonly DemoStep[];
 }
 
 interface Handler {

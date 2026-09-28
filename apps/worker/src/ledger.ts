@@ -11,6 +11,7 @@ import {
   type Verdict,
 } from "@warden/engine";
 import { DurableObject } from "cloudflare:workers";
+import type { DemoStep } from "./demo";
 
 /** A demo ledger takes fixture ground truth as its labels; the live ledger only takes a human's. */
 export type LedgerKind = "demo" | "live";
@@ -105,8 +106,21 @@ export interface DecisionSummary {
   readonly label: Label | null;
 }
 
+export interface RunStatus {
+  readonly status: "running" | "done" | "failed";
+  readonly next: number;
+  readonly total: number;
+  readonly reason: string | null;
+}
+
+export type StartRunResult =
+  | { readonly ok: true; readonly total: number }
+  | { readonly ok: false; readonly error: "not_open" | "not_a_demo_ledger" | "already_started" };
+
 export interface LedgerState {
   readonly kind: LedgerKind;
+  /** Set on a demo ledger once its run has started. */
+  readonly run?: RunStatus;
   readonly scope: Scope;
   readonly permission: Permission;
   readonly blocklist: readonly BlockedUrl[];
@@ -347,6 +361,10 @@ export class Ledger extends DurableObject<Env> {
       events: outcome.events,
       permission: outcome.permission,
     };
+  }
+
+  startRun(_plan: readonly DemoStep[]): StartRunResult {
+    throw new Error("not implemented");
   }
 
   state(): LedgerState | null {

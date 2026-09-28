@@ -10,4 +10,5 @@ export default createApp({
   // The real Workers AI model is wired in once the account token has Workers AI permission.
   model: () => null,
   liveLedgerName: (scopeHash) => `live:${scopeHash}`,
+  demoPlan: () => [],
 }) satisfies ExportedHandler<Env>;
