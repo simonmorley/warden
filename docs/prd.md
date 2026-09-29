@@ -152,7 +152,7 @@ A flawless run needs 73 confirmed-correct calls. One mistake and it needs 110, t
 
 - **Repeated checking.** Testing the bar after every result and promoting the first time it passes inflates the chance of passing by luck. Production would use a method built for continuous checking — a sequential probability ratio test, or an anytime-valid confidence sequence.
 - **Independence.** Wilson assumes independent samples. One phishing kit deployed across many URLs is one piece of evidence, not many, so counting pages overstates what has been proven. Production would count clusters or campaigns rather than pages.
-- **Population.** A templated fixture set demonstrates the mechanism. It does not measure the classifier's accuracy on real traffic, and nothing here should be read as if it did.
+- **Population.** A templated fixture set measures a configuration's accuracy on that set, and demonstrates the mechanism. It does not measure the classifier's accuracy on real traffic, and nothing here should be read as if it did. That is why scoring a configuration grants nothing (section 13).
 
 ### 6.3 When the bar is out of reach
 
@@ -233,7 +233,7 @@ There is a fair criticism of the gate, and it isn't that it should be learned. I
 4. Human labelling that updates the track record.
 5. One action: simulated block of an exact URL.
 6. Revocation and reversal on a confirmed mistake.
-7. A demo run that drives the whole lifecycle through live inference, on a fresh ledger each time.
+7. Scoring a configuration: the labelled set through live inference, measured against the bar, with the whole permission lifecycle rehearsed on a fresh ledger each time.
 8. One dashboard page.
 
 **Out, and why:**
@@ -314,7 +314,15 @@ The platform helps but is not the argument: a Worker has no route into a private
 - **Access** in front of the endpoints that apply labels. "Trusted" currently means holding a shared token, so a label can't be attributed to a person and a single analyst can't be revoked. Access would make it an authenticated identity, putting a name on every label in the audit trail and a service token on machine submissions.
 - **Tunnel**, for the production shape rather than this one. A Worker has no origin to tunnel to. A real deployment puts the enforcement adapter and the analyst console inside the operator's own network, where Tunnel reaches them with no public ingress and no inbound ports open.
 
-## 13. The demo
+## 13. Scoring a configuration
+
+**Two gates.** Scoring qualifies the *configuration*: is this model, prompt and policy good enough, on pages whose answers are known, to be worth deploying? The live ledger qualifies the *deployment*: whatever the score says, the live permission starts at zero and is earned from an analyst's judgements on real reports. A score grants nothing, because a labelled set is not the traffic the permission would act on (section 6.2, population).
+
+**The result comes first.** Measured accuracy of the phishing calls — the same calls the bar is measured on — with the Wilson interval around it, and one of three verdicts from section 6.3: clears the bar, not yet, or unqualifiable. It spans the whole run: a revocation restarts the rehearsal's permission, but every page judged is still evidence about the configuration. Missed phishing and unusable answers are reported beside it, since the bar deliberately ignores them. The breakdown by campaign is the result in detail, and the default view: siblings share a technique, so a campaign is closer to one piece of evidence than to many.
+
+**Then what that accuracy would do on live traffic.** The same pages are replayed through the permission rules on the run's own throwaway ledger, as if each were a real report and each known answer an analyst's judgement. That is the arc below — earned, used, lost — shown as a rehearsal, never as a grant.
+
+Nothing learns from a score. The model and prompt are fixed; scoring measures them and changes nothing about them.
 
 One button. Every verdict is a live Workers AI call against the fixture set — nothing is recorded or replayed. Labels stand in for an analyst, taken from each page's hand-set ground truth, and the screen says so. Each run gets a fresh ledger, so runs don't interfere and a run needs no reset. The live ledger has one, for the demonstration rather than the mechanism: without it a few experiments pollute it permanently and the next viewer inherits them.
 
@@ -343,7 +351,7 @@ One page:
 - Unreviewed automatic actions, out of 3.
 - A feed of decisions: verdict, cited evidence, validation result, label, what the permission check said, what happened.
 - Promotions, revocations and reversals, with reasons.
-- Buttons: run demo, try it live.
+- Buttons: score a configuration, try it live.
 
 ## 15. Scope discipline
 

@@ -6,6 +6,25 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-29 — The demo is an evaluation harness
+
+**Changed.** "Demo run" is now **Score a configuration**, and the screen leads with what the run measured rather than with the permission arc:
+
+- **The result first.** Measured accuracy of the phishing calls on the labelled set, the interval around it, and a verdict: clears the bar, not yet, or unqualifiable. It is computed by the engine over the whole run, every epoch included.
+- **By campaign is the default view.** It is the result, broken down.
+- **The permission arc stays, set apart and relabelled.** It is what this accuracy would do on live traffic, rehearsed on a throwaway ledger, and says plainly that it grants nothing.
+- **Two gates, stated on screen.** This screen qualifies the configuration; the live ledger qualifies the deployment.
+
+**What didn't change.** The pipeline, the engine's rules, the ledger, and the run itself. The API and code keep the name "demo run" (`/demo/runs`): the mechanism is the same one, and renaming a working endpoint for a change of framing would be churn, not design.
+
+**Why.** Framed as a demo, a run invited the reading that the model was learning its way into being trusted, and it buried the most useful thing it produces — a measurement of one model, prompt and policy on pages whose answers are known. That measurement is also a real step in deploying anything: a configuration that can't clear the bar on a labelled set isn't worth the live queue's time. The separation matters as much as the number. A labelled set is not the traffic a permission acts on, which is exactly why a score can't be a grant, and the live ledger still starts from zero.
+
+**Raised by.** Simon.
+
+**Docs.** PRD §6.2 (population), §9, §13 and §14; technical design §3F and §3H.
+
+---
+
 ## 2026-09-29 — The upper bound, and a record that can't qualify
 
 **Changed.** The engine computes the Wilson upper bound alongside the lower, and qualifies a track record against the bar as one of three things: **clears**, **not yet**, or **unqualifiable**. A SHADOW record whose ceiling is under the bar is reported as **UNQUALIFIABLE**.

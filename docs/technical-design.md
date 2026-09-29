@@ -124,7 +124,7 @@ Thin. One shared types module defines every request and response shape.
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | `POST` | `/demo/runs` | token | Start a demo run. Creates a fresh ledger, returns its run id |
-| `GET` | `/demo/runs/:id` | — | Ledger state, decision feed and events for that run |
+| `GET` | `/demo/runs/:id` | — | That run's evaluation of its configuration, and its rehearsal ledger's state, standing, decision feed and events |
 | `POST` | `/classify` | token | Try it live: classify one fixture or pasted snapshot against the live ledger |
 | `GET` | `/live` | — | Live ledger state, decision feed and events |
 | `POST` | `/live/labels` | token | Apply a human label to a live decision |
@@ -146,7 +146,7 @@ The run's own ledger Durable Object drives itself on alarms, processing a batch 
 
 ### H. Dashboard
 
-The thing users actually work from. Permission state, versions, epoch, score against the bar, unreviewed actions against the cap, the decision feed with cited evidence and validation results, and the promotion, revocation and reversal events. Buttons for a demo run and for trying one page live.
+The thing users actually work from. Permission state, versions, epoch, score against the bar, unreviewed actions against the cap, the decision feed with cited evidence and validation results, and the promotion, revocation and reversal events. A screen for scoring a configuration, which leads with the evaluation — measured accuracy, its interval, and clears, not yet or unqualifiable — breaks it down by campaign, and only then shows the permission rehearsal, marked as one. A button for trying one page live.
 
 ### I. CLI — bonus
 
