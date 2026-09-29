@@ -32,47 +32,49 @@
         <h2 id="about-title">An AI can spot a phishing page in a second.</h2>
         <p class="ask">Should it be allowed to take that page down by itself?</p>
         <p class="answer">
-          Warden's answer: <b>not until it has proved it</b> — and only until one of its blocks turns out to be wrong.
+          Warden's answer: <b>not until it has proved it</b>, and only until one of its blocks turns out to be wrong.
         </p>
 
         <ol class="ladder" aria-label="How permission is earned and lost">
           <li class="rung shadow">
-            <span class="rung-name">Recommends only <span class="rung-key">SHADOW</span></span>
+            <span class="rung-name">Recommends only</span>
             <span class="rung-note">Every verdict goes to a person.</span>
           </li>
           <li class="gate" aria-hidden="true"><span>73 confirmed correct</span></li>
           <li class="rung earning">
-            <span class="rung-name">On trial <span class="rung-key">EARNING</span></span>
-            <span class="rung-note">Strong enough — but not yet proved.</span>
+            <span class="rung-name">On trial</span>
+            <span class="rung-note">Cleared the bar, but still can't act. Ten clean checks to go.</span>
           </li>
           <li class="gate" aria-hidden="true"><span>10 more in a row</span></li>
           <li class="rung autonomous">
-            <span class="rung-name">Acts alone <span class="rung-key">AUTONOMOUS</span></span>
+            <span class="rung-name">Acts alone</span>
             <span class="rung-note">Blocks a URL itself. Three at most await review.</span>
           </li>
         </ol>
-        <p class="fall">One wrong block and it falls all the way back — block undone, counting starts from zero.</p>
+        <p class="fall">One wrong block and it falls all the way back. The block is undone and counting starts from zero.</p>
         <p class="out-of-reach">
-          And when the evidence says it never will — the best its accuracy could plausibly be is under the bar — it
-          says so: <b>Can't qualify</b> <span class="rung-key">UNQUALIFIABLE</span>. Waiting won't help. Changing the
-          model or the prompt will, and starts a new record from zero.
+          If the evidence says it can never clear the bar, Warden says so instead of waiting forever. A different
+          model or prompt starts a new record.
         </p>
 
         <div class="facts">
           <div>
             <h3>Nothing is trained</h3>
             <p>
-              The model and prompt never change. Warden measures a fixed classifier and decides what it may do.
-              Scoring one measures it; nothing it gets right or wrong feeds back into it.
+              The model and prompt are fixed. Warden measures a classifier and decides what it may do; nothing it gets
+              right or wrong feeds back in.
             </p>
           </div>
           <div>
             <h3>A verdict can't authorise itself</h3>
-            <p>Whether a verdict acts is decided by arithmetic the model cannot reach. A page that fools the classifier still doesn't get a block.</p>
+            <p>
+              Whether a verdict acts is decided by arithmetic the model can't reach. A page that fools the classifier
+              still doesn't get a block.
+            </p>
           </div>
           <div>
             <h3>73 is not arbitrary</h3>
-            <p>Three right out of three is 100% and means nothing. 73 is where being certain enough actually starts.</p>
+            <p>Three right out of three is 100% and proves nothing. 73 is where the evidence starts to mean something.</p>
           </div>
         </div>
 
@@ -81,25 +83,17 @@
           <li>
             <b>Score a configuration</b>
             <span>
-              Start here. <span class="corpus-size">A set of</span> pages whose real answers are already known, run
-              through the live model: does this model, prompt and policy clear the bar, not yet, or never? Then see
-              what that accuracy would do to permission on live traffic — earned, used, and lost to a page that tricks
-              it. Two to three minutes; every verdict is a live model call.
+              Start here. <span class="corpus-size">A set of</span> pages with known answers, run through the live
+              model: does it clear the bar, not yet, or never? Two to three minutes.
             </span>
           </li>
           <li>
             <b>Send a page</b>
-            <span>
-              Try one yourself. Pick a test page or paste your own, and see each step: what was extracted, what the
-              model said, whether its evidence held up, and what it was allowed to do.
-            </span>
+            <span>Try one yourself and watch each step.</span>
           </li>
           <li>
             <b>Review</b>
-            <span>
-              Say whether each verdict was right. This is the only thing that moves Warden's record — and only a
-              verdict of <em>phishing</em> counts, because being right that a page is harmless is easy.
-            </span>
+            <span>Say whether a verdict was right. Only this moves the record.</span>
           </li>
         </ol>
       </section>

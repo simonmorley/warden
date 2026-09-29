@@ -1090,15 +1090,6 @@ details#try-advanced[open] summary {
   font-size: 0.85rem;
 }
 
-/* Both vocabularies, once, so the dashboard's colours and the design docs map to each other. */
-.rung-key {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  opacity: 0.75;
-}
-
 /* Two gates, side by side: the configuration is qualified here, the deployment under Review. */
 .gates {
   display: grid;
