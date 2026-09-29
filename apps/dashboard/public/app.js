@@ -486,24 +486,26 @@ function renderEvaluation(container, state) {
   const view = views.get(container.id) ?? "campaigns";
   container.replaceChildren(
     runStatus(state.run, state),
+    el("div", { class: "section-eyebrow" }, "1 · The answer: is this model, prompt and policy good enough?"),
     resultPanel(state),
+    el("div", { class: "section-eyebrow" }, "2 · The same answer, campaign by campaign"),
     decisionFeed(state, view, container),
     el(
       "div",
       { class: "arc" },
-      el("h3", {}, "What this precision would do on live traffic"),
+      el("div", { class: "section-eyebrow" }, "3 · What that would mean for permission: a rehearsal"),
+      el("p", { class: "arc-summary" }, rehearsalOutcome(state)),
       el(
         "p",
         { class: "sandbox" },
         el("strong", {}, "A rehearsal, not a grant. "),
         "The same pages, replayed through Warden's permission rules on a throwaway ledger as if each were a real report " +
-          "and each known answer an analyst's judgement. It shows how permission would be earned, used and lost at this " +
-          "precision. Nothing here carries over: the live system starts from zero whatever this shows.",
+          "and each known answer an analyst's judgement. Nothing here carries over: the live system, top right, earns " +
+          "its own permission under Review.",
       ),
       ladder(state),
       story(state, state.run),
-      ...rebuildingNote(state),
-      ...(state.permission.right + state.permission.wrong > 0 ? [summaryTiles(state)] : []),
+      ...(state.permission.right + state.permission.wrong > 0 ? [el("h4", {}, "Where the rehearsal ended"), summaryTiles(state)] : []),
       el("h4", {}, "What changed, and why"),
       // Known answers do the confirming here, so the prompt to confirm a verdict doesn't apply.
       eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false, state.policy.requiredScore),
@@ -535,31 +537,44 @@ function runStatus(run, state) {
   );
 }
 
-/** Why a finished rehearsal can end at "recommends only" without anything having gone wrong. */
-function rebuildingNote(state) {
-  const rebuilding = state.run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
-  if (!rebuilding) return [];
-  return [
-    el(
-      "p",
-      { class: "hint" },
-      `The rehearsal ended part-way through starting over, which is why it finishes at "recommends only". ` +
-        `Permission was revoked on attempt ${state.permission.epoch - 1}, and the remaining pages began rebuilding ` +
-        `the record from zero. That is the design working, not the run failing.`,
-    ),
-  ];
+/**
+ * What happened to permission in the rehearsal, in one sentence, so nobody has to piece it
+ * together from the ladder, the checklist and the tiles — or mistake its end state for the verdict.
+ */
+function rehearsalOutcome(state) {
+  const promotions = state.events.filter((recorded) => recorded.event.kind === "promoted");
+  const trial = promotions.find((recorded) => recorded.event.to === "EARNING");
+  const autonomy = promotions.find((recorded) => recorded.event.to === "AUTONOMOUS");
+  const revoked = state.events.some((recorded) => recorded.event.kind === "revoked");
+  const blocked = state.decisions.filter((decision) => decision.route.to === "block").length;
+  const { permission } = state;
+  const soFar = state.run.status === "running" ? "So far in this rehearsal, " : "In this rehearsal, ";
+
+  if (!trial) return `${soFar}it never earned permission to act. Every verdict would have gone to a person.`;
+  if (!autonomy) {
+    return `${soFar}it cleared the bar after ${trial.event.tally.right} correct calls and went on trial, but never finished the trial, so it never acted alone.`;
+  }
+  const earned = `${soFar}it earned the right to act alone after ${autonomy.event.tally.right} correct calls, and blocked ${plural(blocked, "URL")} on its own.`;
+  if (!revoked) return `${earned} It still held that permission at the end.`;
+  return (
+    `${earned} Then one of its blocks turned out to be wrong, so the block was undone and permission withdrawn. ` +
+    `It ended rebuilding from zero: ${permission.right} of ${permission.right + permission.wrong} correct since.`
+  );
 }
 
 /** What each answer to "does this configuration clear the bar?" means, and what to do about it. */
 const QUALIFICATIONS = {
   clears: {
     title: "Clears the bar",
+    plain: () => "Proven good enough on these pages.",
     meaning: ({ lower }, bar) =>
       `The worst its precision could plausibly be is ${boundPct(lower, bar)}, at or above the bar. Worth deploying — where it ` +
       "still starts with no permission, and has to earn it again from real reports.",
   },
   not_yet: {
     title: "Not yet",
+    plain: (bar) =>
+      `Good, but not proven good enough. On these pages its precision can't be shown to reach ${pct(bar)}, and can't be ruled out either.`,
     meaning: ({ lower }) =>
       lower === null
         ? "No phishing call has been judged yet, so there is nothing to measure."
@@ -567,6 +582,7 @@ const QUALIFICATIONS = {
   },
   unqualifiable: {
     title: "Unqualifiable",
+    plain: (bar) => `Proven not good enough. Its precision can't plausibly reach ${pct(bar)}.`,
     meaning: ({ upper }, bar) =>
       `The best its precision could plausibly be is ${boundPct(upper, bar)}, under the bar. On the evidence so far, this ` +
       "model and prompt will not clear the bar. More pages won't change that — a different model or prompt starts a new record.",
@@ -587,6 +603,13 @@ function resultPanel({ evaluation, policy, run, scope }) {
       { class: "result-head" },
       el("span", { class: `qualification ${qualification}` }, verdict.title),
       run.status === "running" ? el("span", { class: "provisional" }, "so far — provisional until every page is scored") : null,
+    ),
+    el("p", { class: "plain" }, verdict.plain(policy.requiredScore)),
+    el(
+      "p",
+      { class: "muted" },
+      "This judges the configuration, not what it's allowed to do. It grants no permission: section 3 rehearses that, " +
+        "and the live system, top right, earns its own under Review.",
     ),
     el(
       "div",
