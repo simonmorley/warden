@@ -20,45 +20,27 @@ const appWith = () => {
   return createApp({ model: () => model, liveLedgerName: () => name, demoPlan: () => [] });
 };
 const local = { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "true" };
-const guarded = { ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" };
 
-const call = (app: ReturnType<typeof createApp>, method: string, path: string, body?: unknown, bindings = local) =>
+const call = (app: ReturnType<typeof createApp>, method: string, path: string, body?: unknown) =>
   app.fetch(
     new Request(`https://warden.test${path}`, {
       method,
       headers: { "content-type": "application/json" },
       body: body === undefined ? null : JSON.stringify(body),
     }),
-    bindings,
+    local,
   );
 
-describe("POST /live/reset", () => {
-  it("empties the record, so a demonstration can start over without a stale history", async () => {
+// The live record is what a deployment's permission rests on, and it is meant to be permanent.
+// Scoring runs get a throwaway ledger each, so nothing needs a way to wipe this one.
+describe("the live record", () => {
+  it("cannot be emptied over HTTP: there is no reset", async () => {
     const app = appWith();
     await call(app, "POST", "/classify", PHISH);
-    expect((await (await call(app, "GET", "/live")).json<{ decisions: unknown[] }>()).decisions).toHaveLength(1);
 
     const reset = await call(app, "POST", "/live/reset");
 
-    expect(reset.status).toBe(200);
-    const after = await (await call(app, "GET", "/live")).json<{ decisions: unknown[]; permission: { epoch: number } }>();
-    expect(after.decisions).toHaveLength(0);
-    expect(after.permission).toMatchObject({ state: "SHADOW", epoch: 1, right: 0, wrong: 0 });
-  });
-
-  it("leaves a usable record behind, not a broken one", async () => {
-    const app = appWith();
-    await call(app, "POST", "/classify", PHISH);
-    await call(app, "POST", "/live/reset");
-
-    const res = await call(app, "POST", "/classify", PHISH);
-
-    expect(res.status).toBe(200);
+    expect(reset.status).toBe(404);
     expect((await (await call(app, "GET", "/live")).json<{ decisions: unknown[] }>()).decisions).toHaveLength(1);
-  });
-
-  it("needs the token on a deployment, since it destroys a record", async () => {
-    const res = await call(appWith(), "POST", "/live/reset", undefined, guarded);
-    expect(res.status).toBe(401);
   });
 });
