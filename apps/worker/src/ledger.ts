@@ -194,6 +194,7 @@ export class Ledger extends DurableObject<Env> {
       blocklist: this.store.blocklist(),
       decisions: this.store.decisions(),
       events: this.store.events(),
+      judgements: this.store.judgements(),
       ...(run && { run: { status: run.status, next: run.progress.next, total: run.total, reason: run.reason } }),
     };
   }

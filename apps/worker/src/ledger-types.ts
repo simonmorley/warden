@@ -114,6 +114,17 @@ export type StartRunResult =
   | { readonly ok: true; readonly total: number }
   | { readonly ok: false; readonly error: "not_open" | "not_a_demo_ledger" | "already_started" };
 
+/** One label, as the record met it: which decision, which way, and whether it could count. */
+export interface Judgement {
+  readonly decisionId: string;
+  readonly label: Label;
+  /** Whether the decision was eligible; a label only moves the record if it was, in the current epoch. */
+  readonly counted: boolean;
+  /** The epoch the decision was made in. */
+  readonly epoch: number;
+  readonly labelledAt: number;
+}
+
 export interface LedgerState {
   readonly kind: LedgerKind;
   /** Set on a demo ledger once its run has started. */
@@ -123,4 +134,6 @@ export interface LedgerState {
   readonly blocklist: readonly BlockedUrl[];
   readonly decisions: readonly DecisionSummary[];
   readonly events: readonly RecordedEvent[];
+  /** Every label, in the order given, so the record can be replayed step by step. */
+  readonly judgements: readonly Judgement[];
 }

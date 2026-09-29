@@ -126,7 +126,7 @@ Thin. One shared types module defines every request and response shape.
 | `POST` | `/demo/runs` | token | Start a demo run. Creates a fresh ledger, returns its run id |
 | `GET` | `/demo/runs/:id` | — | That run's evaluation of its configuration, and its rehearsal ledger's state, standing, decision feed and events |
 | `POST` | `/classify` | token | Try it live: classify one fixture or pasted snapshot against the live ledger |
-| `GET` | `/live` | — | Live ledger state, decision feed and events |
+| `GET` | `/live` | — | Live ledger state, decision feed, events, and every judgement in the order it was given |
 | `POST` | `/live/labels` | token | Apply a human label to a live decision |
 | `GET` | `/` | — | Dashboard |
 

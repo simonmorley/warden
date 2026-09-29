@@ -3,6 +3,7 @@ import type { RunProgress } from "../demo";
 import type {
   BlockedUrl,
   DecisionSummary,
+  Judgement,
   LabelInput,
   LedgerKind,
   PageRef,
@@ -44,6 +45,15 @@ const SELECT_DECISIONS = `SELECT d.id, d.url, d.verdict, d.valid, d.rejection, d
 
 /** The label already on a decision, if any. */
 const SELECT_LABEL = "SELECT label FROM labels WHERE decision_id = ?";
+/**
+ * Every label in the order it was given, with the facts about its decision that say whether it
+ * moved the record. Ordered by rowid, not time: a Worker's clock stands still within a request,
+ * so labels applied together share a timestamp, while rowids keep their insertion order.
+ */
+const SELECT_JUDGEMENTS = `SELECT l.decision_id, l.label, d.counted, d.epoch, l.created_at
+  FROM labels l
+  JOIN decisions d ON d.id = l.decision_id
+  ORDER BY l.rowid`;
 /** Records a decision's label. The primary key refuses a second one. */
 const INSERT_LABEL =
   "INSERT INTO labels (decision_id, label, source, labelled_by, created_at) VALUES (?, ?, ?, ?, ?)";
@@ -237,6 +247,20 @@ export class LedgerStore {
   labelOf(decisionId: string): Label | undefined {
     const row = this.sql.exec<{ label: string }>(SELECT_LABEL, decisionId).toArray()[0];
     return row?.label as Label | undefined;
+  }
+
+  /** Every judgement, in the order it was given. */
+  judgements(): Judgement[] {
+    return this.sql
+      .exec<{ decision_id: string; label: string; counted: number; epoch: number; created_at: number }>(SELECT_JUDGEMENTS)
+      .toArray()
+      .map((row) => ({
+        decisionId: row.decision_id,
+        label: row.label as Label,
+        counted: row.counted === 1,
+        epoch: row.epoch,
+        labelledAt: row.created_at,
+      }));
   }
 
   /** Records a decision's label. */
