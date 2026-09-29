@@ -15,10 +15,17 @@
   },
   // One ledger per permission: each demo run gets its own, and the live ledger is its own.
   // SQLite-backed, so a ledger's storage is a real database, locally and in production.
+  // RUNS remembers which scoring runs were started, so the latest can be found from any browser.
   "durable_objects": {
-    "bindings": [{ "name": "LEDGER", "class_name": "Ledger" }]
+    "bindings": [
+      { "name": "LEDGER", "class_name": "Ledger" },
+      { "name": "RUNS", "class_name": "RunIndex" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Ledger"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Ledger"] },
+    { "tag": "v2", "new_sqlite_classes": ["RunIndex"] }
+  ],
   // The classifier. Chosen on false positives across the fixture set's traps and hard
   // negatives — see docs/decision-log.md.
   "ai": { "binding": "AI" },

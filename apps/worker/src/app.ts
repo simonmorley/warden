@@ -17,6 +17,8 @@ export interface Dependencies {
   liveLedgerName(scopeHash: string): string;
   /** The pages a demo run walks through, in order. */
   demoPlan(): readonly DemoStep[];
+  /** The run index's Durable Object name. Injected so tests don't share one; one index otherwise. */
+  runIndexName?: () => string;
   /** How a reported page is fetched when no source is given. Injected so tests never leave the machine. */
   fetcher?: typeof fetch;
 }
@@ -43,6 +45,8 @@ const ROUTES: readonly Route[] = [
   { pattern: /^\/corpus\/pages\/([^/]+)$/, handlers: { GET: { auth: false, run: readCorpusPage } } },
   { pattern: /^\/corpus\/pages\/([^/]+)\/source$/, handlers: { GET: { auth: false, run: serveCorpusPage } } },
   { pattern: /^\/demo\/runs$/, handlers: { POST: { auth: true, run: startDemoRun } } },
+  // Before the run-id route, which would otherwise take "latest" for an id.
+  { pattern: /^\/demo\/runs\/latest$/, handlers: { GET: { auth: false, run: latestDemoRun } } },
   { pattern: /^\/demo\/runs\/([^/]+)$/, handlers: { GET: { auth: false, run: watchDemoRun } } },
 ];
 
@@ -255,8 +259,22 @@ async function startDemoRun(_request: Request, env: Env, dependencies: Dependenc
   if (!opened.ok) throw new Error(`could not open a demo ledger: ${opened.error}`);
   const started = await stub.startRun(plan);
   if (!started.ok) throw new Error(`could not start a demo run: ${started.error}`);
+  await runIndex(env, dependencies).record(runId, Date.now());
 
   return json({ runId, total: started.total, watch: `/demo/runs/${runId}` }, 202);
+}
+
+/** The run index: which scoring runs were started, so the latest can be found from anywhere. */
+function runIndex(env: Env, dependencies: Dependencies) {
+  const name = dependencies.runIndexName?.() ?? "runs";
+  return env.RUNS.get(env.RUNS.idFromName(name));
+}
+
+/** Where the most recently started scoring run is, so any browser can reopen it. Spends nothing. */
+async function latestDemoRun(_request: Request, env: Env, dependencies: Dependencies): Promise<Response> {
+  const runId = await runIndex(env, dependencies).latest();
+  if (!runId) return problem(404, "not_found", "No scoring run has been started yet.");
+  return json({ runId, watch: `/demo/runs/${runId}` });
 }
 
 async function watchDemoRun(

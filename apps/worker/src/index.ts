@@ -3,6 +3,7 @@ import { createApp } from "./app";
 import { modelFor } from "./model";
 
 export { Ledger } from "./ledger";
+export { RunIndex } from "./run-index";
 
 /**
  * Warden's Worker. Every request reaches it first (`run_worker_first`), so routing is

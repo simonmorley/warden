@@ -6,6 +6,20 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-29 — The server remembers the latest scoring run
+
+**Changed.** A second Durable Object class, `RunIndex`, records each scoring run's id as it starts, and `GET /demo/runs/latest` returns the most recent. Opening the Score page with no run in the address shows that run. A run can also be linked directly as `#score/<run id>`.
+
+**Why.** Each run's results were always kept, in the run's own ledger, but its id lived only in the browser that started it. Close the tab or change browser and the results were unreachable, with no way to list them. The index holds ids and nothing else; the results stay where they were.
+
+**Why a Durable Object and not D1 or KV.** It needs one small ordered list, written once per run and read on page load. A single SQLite-backed object with the same migration and storage conventions as the ledger does that without a new kind of storage in the project. Order is by insertion, so two runs started in the same millisecond still sort correctly.
+
+**Raised by.** Simon, recording a walkthrough: the results vanished on switching browser.
+
+**Docs.** Technical design §3F.
+
+---
+
 ## 2026-09-29 — The live record has no reset
 
 **Changed.** `POST /live/reset` is gone, along with the ledger method behind it and the "Start over" button on Review. The live record can no longer be emptied over HTTP; a test now holds it to that.
