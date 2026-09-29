@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wilsonLowerBound } from "../src/index";
+import { wilsonLowerBound, wilsonUpperBound } from "../src/index";
 
 // Two-sided 95%, so the lower end is a 97.5% one-sided bound (PRD 6.2).
 const Z = 1.96;
@@ -75,5 +75,61 @@ describe("wilsonLowerBound", () => {
 
   it.each([0, -1.96, Number.NaN])("refuses a z of %d", (z) => {
     expect(() => wilsonLowerBound(1, 1, z)).toThrow(RangeError);
+  });
+});
+
+describe("wilsonUpperBound", () => {
+  it("returns null with no evidence, because there is nothing to put a ceiling over", () => {
+    expect(wilsonUpperBound(0, 0, Z)).toBeNull();
+  });
+
+  it("is the lower bound seen from the other side: the ceiling on right is one minus the floor on wrong", () => {
+    for (let n = 1; n <= 60; n++) {
+      for (let right = 0; right <= n; right++) {
+        expect(wilsonUpperBound(right, n, Z)).toBeCloseTo(1 - wilsonLowerBound(n - right, n, Z)!, 12);
+      }
+    }
+  });
+
+  it("never sits below the lower bound, and never leaves [0, 1]", () => {
+    for (let n = 1; n <= 50; n++) {
+      for (let right = 0; right <= n; right++) {
+        const upper = wilsonUpperBound(right, n, Z)!;
+        expect(upper).toBeGreaterThanOrEqual(wilsonLowerBound(right, n, Z)!);
+        expect(upper).toBeGreaterThanOrEqual(0);
+        expect(upper).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("can't rule out perfection while every call has been right", () => {
+    for (const n of [1, 3, 73, 500]) expect(wilsonUpperBound(n, n, Z)).toBe(1);
+  });
+
+  // The case the upper bound exists for: a classifier that is good, but not good enough, and
+  // how long it takes the evidence to say so rather than leaving it to grind forever.
+  it("rules out a 90% classifier at around 80 calls", () => {
+    expect(wilsonUpperBound(63, 70, Z)).toBeGreaterThanOrEqual(BAR);
+    expect(wilsonUpperBound(72, 80, Z)).toBeLessThan(BAR);
+  });
+
+  it("falls with more evidence at the same hit rate", () => {
+    const tenth = wilsonUpperBound(9, 10, Z)!;
+    const hundredth = wilsonUpperBound(90, 100, Z)!;
+    const thousandth = wilsonUpperBound(900, 1000, Z)!;
+    expect(hundredth).toBeLessThan(tenth);
+    expect(thousandth).toBeLessThan(hundredth);
+  });
+
+  it.each([
+    [4, 3],
+    [-1, 3],
+    [1.5, 3],
+  ])("refuses impossible counts (%d right out of %d) rather than returning a number", (right, n) => {
+    expect(() => wilsonUpperBound(right, n, Z)).toThrow(RangeError);
+  });
+
+  it.each([0, Number.NaN])("refuses a z of %d", (z) => {
+    expect(() => wilsonUpperBound(1, 1, z)).toThrow(RangeError);
   });
 });
