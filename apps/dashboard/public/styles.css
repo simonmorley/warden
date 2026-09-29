@@ -254,6 +254,10 @@ progress {
   color: var(--autonomous);
 }
 
+.state.UNQUALIFIABLE {
+  color: var(--danger);
+}
+
 .run {
   display: grid;
   gap: 0.3rem;
@@ -282,6 +286,8 @@ h3 {
 }
 
 .events li {
+  /* A reversed block names its URL, and a long one mustn't widen the page on a phone. */
+  overflow-wrap: anywhere;
   padding: 0.45rem 0.7rem;
   border-left: 3px solid var(--line);
   background: var(--bg);
@@ -497,6 +503,7 @@ footer {
 /* Switching how much of the decision feed to show. */
 .views {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
@@ -561,6 +568,8 @@ button.event-link {
   background: none;
   color: inherit;
   font: inherit;
+  /* It carries a sentence, not a label, so it wraps like one. */
+  white-space: normal;
   text-align: left;
   cursor: pointer;
   text-decoration: underline;
@@ -830,12 +839,22 @@ button.tab.current {
 }
 
 .hero .fall {
-  margin: 0.6rem 0 1.75rem;
+  margin: 0.6rem 0;
   padding: 0.55rem 0.8rem;
   border-left: 3px solid var(--danger);
   border-radius: 0 6px 6px 0;
   background: var(--bg);
   color: var(--danger);
+  font-size: 0.9rem;
+}
+
+/* The third answer to the bar: not yet, cleared, or out of reach on this evidence. */
+.hero .out-of-reach {
+  margin: 0 0 1.75rem;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--shadow);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg);
   font-size: 0.9rem;
 }
 
@@ -852,45 +871,6 @@ button.tab.current {
   .ladder .gate span::before {
     content: "↓";
   }
-}
-
-/* Where a run has been, not only where it ended. */
-.journey {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.4rem 0.9rem;
-  margin-top: 0.4rem;
-}
-
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.step {
-  font-size: 0.8rem;
-  color: var(--muted);
-  opacity: 0.55;
-}
-
-.step.reached {
-  opacity: 1;
-  font-weight: 650;
-}
-
-.step.reached.EARNING {
-  color: var(--earning);
-}
-
-.step.reached.AUTONOMOUS {
-  color: var(--autonomous);
-}
-
-.journey .outcome {
-  font-size: 0.82rem;
-  color: var(--muted);
 }
 
 /* How to use this: three steps, in the order someone should take them. */
@@ -1009,6 +989,10 @@ details#try-advanced[open] summary {
   color: var(--autonomous);
 }
 
+.live-status-mode.UNQUALIFIABLE {
+  color: var(--danger);
+}
+
 /* A rehearsal, and it must be impossible to mistake for the real thing. */
 .sandbox {
   margin: 0 0 0.9rem;
@@ -1106,11 +1090,122 @@ details#try-advanced[open] summary {
   font-size: 0.85rem;
 }
 
-/* Both vocabularies, once, so the demo's colours and the design docs map to each other. */
+/* Both vocabularies, once, so the dashboard's colours and the design docs map to each other. */
 .rung-key {
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--muted);
   opacity: 0.75;
+}
+
+/* Two gates, side by side: the configuration is qualified here, the deployment under Review. */
+.gates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+}
+
+.gate-card {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.gate-card span {
+  color: var(--muted);
+}
+
+/* The evaluation's result, first and largest: the verdict and the measured accuracy. */
+.result-panel {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--shadow);
+  border-radius: 8px;
+}
+
+.result-panel.clears {
+  border-left-color: var(--autonomous);
+}
+
+.result-panel.not_yet {
+  border-left-color: var(--earning);
+}
+
+.result-panel.unqualifiable {
+  border-left-color: var(--danger);
+}
+
+.result-panel p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.qualification {
+  font-size: 1.15rem;
+  font-weight: 750;
+}
+
+.qualification.clears {
+  color: var(--autonomous);
+}
+
+.qualification.not_yet {
+  color: var(--earning);
+}
+
+.qualification.unqualifiable {
+  color: var(--danger);
+}
+
+.measured {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.measured-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.measured-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.result-panel .scope {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+/* The permission rehearsal, set apart from the result it follows from. */
+.arc-title {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+h4 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
 }

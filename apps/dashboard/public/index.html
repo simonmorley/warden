@@ -19,7 +19,7 @@
       </div>
       <nav class="nav" aria-label="Sections">
         <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
-        <button id="nav-demo" type="button" class="tab">Demo run</button>
+        <button id="nav-demo" type="button" class="tab">Score a configuration</button>
         <button id="nav-try" type="button" class="tab">Send a page</button>
         <button id="nav-review" type="button" class="tab">Review <span id="queue-count" class="queue-count"></span></button>
       </nav>
@@ -52,11 +52,19 @@
           </li>
         </ol>
         <p class="fall">One wrong block and it falls all the way back — block undone, counting starts from zero.</p>
+        <p class="out-of-reach">
+          And when the evidence says it never will — the best its accuracy could plausibly be is under the bar — it
+          says so: <b>Can't qualify</b> <span class="rung-key">UNQUALIFIABLE</span>. Waiting won't help. Changing the
+          model or the prompt will, and starts a new record from zero.
+        </p>
 
         <div class="facts">
           <div>
             <h3>Nothing is trained</h3>
-            <p>The model and prompt never change. Warden measures a fixed classifier and decides what it may do.</p>
+            <p>
+              The model and prompt never change. Warden measures a fixed classifier and decides what it may do.
+              Scoring one measures it; nothing it gets right or wrong feeds back into it.
+            </p>
           </div>
           <div>
             <h3>A verdict can't authorise itself</h3>
@@ -71,11 +79,12 @@
         <h3 class="howto-title">How to use this</h3>
         <ol class="howto">
           <li>
-            <b>Demo run</b>
+            <b>Score a configuration</b>
             <span>
-              Start here — it is the first tab, and tells the whole story on its own. Two to three minutes, <span class="corpus-size">a set of</span> pages whose real answers are already known. Watch Warden earn the
-              right to act, use it, then lose it to a page that tricks it. Nothing is scripted — every verdict is a
-              live model call.
+              Start here. <span class="corpus-size">A set of</span> pages whose real answers are already known, run
+              through the live model: does this model, prompt and policy clear the bar, not yet, or never? Then see
+              what that accuracy would do to permission on live traffic — earned, used, and lost to a page that tricks
+              it. Two to three minutes; every verdict is a live model call.
             </span>
           </li>
           <li>
@@ -138,23 +147,35 @@
 
       <section id="page-demo" hidden aria-labelledby="demo-title">
         <div class="section-head">
-          <h2 id="demo-title">Watch it earn permission</h2>
+          <h2 id="demo-title">Score a configuration</h2>
           <div class="actions">
-            <button id="run-demo" type="button">Run the demo</button>
+            <button id="run-demo" type="button">Score it</button>
             <button id="clear-demo" type="button" class="secondary" hidden>Clear</button>
           </div>
         </div>
-        <p class="sandbox">
-          <b>This is a rehearsal.</b> Every run gets its own throwaway record and cannot touch the one under
-          <b>Review</b>. Nothing here grants or removes any permission that outlives the run.
-        </p>
+        <div class="gates" aria-label="Two gates">
+          <div class="gate-card">
+            <b>This screen qualifies the configuration.</b>
+            <span>
+              Is this model, prompt and policy good enough, on pages whose answers are known, to be worth deploying?
+            </span>
+          </div>
+          <div class="gate-card">
+            <b>The live ledger qualifies the deployment.</b>
+            <span>
+              Whatever this screen says, the live system starts with no permission, and earns it from a person's
+              judgements on real reports under <b>Review</b>. Nothing here grants it anything.
+            </span>
+          </div>
+        </div>
         <p class="note">
-          <span class="corpus-size">A set of</span> pages whose real answers are already known, fed through one after another, each verdict confirmed
-          against that answer — standing in for the analyst who would normally do it. Every verdict is a live model
-          call, so nothing is scripted and the model does get some wrong. Takes two to three minutes; you can leave
-          and come back, and refreshing keeps your place.
+          <span class="corpus-size">A set of</span> pages whose real answers are already known, each classified by the
+          live model and checked against that answer. The result is how often its phishing calls are right, with the
+          range its true accuracy could plausibly fall in. Every verdict is a live model call, so nothing is scripted
+          and the model does get some wrong. Takes two to three minutes; you can leave and come back, and refreshing
+          keeps your place.
         </p>
-        <div id="demo" class="ledger" aria-live="polite"><p class="empty">No run yet.</p></div>
+        <div id="demo" class="ledger" aria-live="polite"><p class="empty">Nothing scored yet.</p></div>
       </section>
 
     </main>

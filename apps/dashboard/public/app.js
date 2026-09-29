@@ -153,6 +153,11 @@ const STATES = {
   SHADOW: { label: "Recommends only", detail: "Everything goes to a person. Nothing is blocked automatically." },
   EARNING: { label: "On trial", detail: "The evidence is strong enough, but it must hold before it may act." },
   AUTONOMOUS: { label: "Acts alone", detail: "It may block a URL by itself, within the limits shown." },
+  // Reported, not stored: SHADOW whose record puts the ceiling on its accuracy under the bar.
+  UNQUALIFIABLE: {
+    label: "Can't qualify",
+    detail: "Everything goes to a person, and on this evidence the bar is out of reach: more of the same won't clear it.",
+  },
 };
 
 /** Why a decision went to a person instead of being acted on: short badge, sentence on hover. */
@@ -246,13 +251,13 @@ function describe(recorded, urlOf) {
   }
 }
 
-/** A demo run's progress in words. */
+/** A scoring run's progress in words. */
 function runText(run) {
   if (run.status === "running") {
     const left = timeLeft(run);
-    return `Running: page ${run.next} of ${run.total}${left ? ` · ${left}` : ""}`;
+    return `Scoring: page ${run.next} of ${run.total}${left ? ` · ${left}` : ""}`;
   }
-  if (run.status === "done") return `Finished: all ${run.total} pages classified`;
+  if (run.status === "done") return `Scored: all ${run.total} pages classified`;
   return `Stopped after ${run.next} of ${run.total} pages: ${run.reason}`;
 }
 
@@ -260,43 +265,149 @@ function runText(run) {
 // is mostly campaign siblings: near-identical pages that nearly all go the same way.
 const views = new Map();
 
-/** Renders a record: run progress, summary tiles, events and the decision feed. Read-only —
+/** Renders the live record: summary tiles, events and the decision feed. Read-only —
  * judgements are given under Review, in one place rather than two. */
 function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
   const view = views.get(container.id) ?? (state.decisions.length > 20 ? "campaigns" : "all");
   container.replaceChildren(
-    ...(state.run ? [runProgress(state.run, state)] : []),
-    ...standing(state),
+    ...recordPanel(state),
     el("h3", {}, "What changed, and why"),
     eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, state.decisions.length > 0),
     ...decisionFeed(state, view, container, onLabel),
   );
 }
 
-/** A demo run's status line, what it cost, and what its end state means. */
-function runProgress(run, state) {
-  const parts = [
+/**
+ * Renders a scoring run as the evaluation it is: the result first, then the result broken
+ * down by campaign, then — set apart — what that accuracy would do to permission on live
+ * traffic, rehearsed on the run's own throwaway ledger.
+ */
+function renderEvaluation(container, state) {
+  const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
+  // By campaign is the result; the other views are there to dig into it.
+  const view = views.get(container.id) ?? "campaigns";
+  container.replaceChildren(
+    runStatus(state.run, state),
+    resultPanel(state),
+    ...decisionFeed(state, view, container),
+    el("h3", { class: "arc-title" }, "What this accuracy would do on live traffic"),
+    el(
+      "p",
+      { class: "sandbox" },
+      el("b", {}, "A rehearsal, not a grant. "),
+      "The same pages, replayed through Warden's permission rules on a throwaway ledger as if each were a real report " +
+        "and each known answer an analyst's judgement. It shows how permission would be earned, used and lost at this " +
+        "accuracy. Nothing here carries over: the live system starts from zero whatever this shows.",
+    ),
+    ladder(state),
+    story(state, state.run),
+    ...rebuildingNote(state),
+    ...(state.permission.right + state.permission.wrong > 0 ? [summaryTiles(state)] : []),
+    el("h4", {}, "What changed, and why"),
+    // Known answers do the confirming here, so the prompt to confirm a verdict doesn't apply.
+    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false),
+  );
+}
+
+/** A scoring run's status line, progress and what it has cost so far. */
+function runStatus(run, state) {
+  return el(
+    "div",
+    { class: "run" },
     el("span", { class: `status ${run.status}` }, runText(run)),
     el("progress", { value: run.next, max: run.total }),
-    ladder(state),
-    story(state, run),
     el("div", { class: "cost" }, costOf(state.decisions.length)),
+  );
+}
+
+/** Why a finished rehearsal can end at "recommends only" without anything having gone wrong. */
+function rebuildingNote(state) {
+  const rebuilding = state.run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
+  if (!rebuilding) return [];
+  return [
+    el(
+      "p",
+      { class: "hint" },
+      `The rehearsal ended part-way through starting over, which is why it finishes at "recommends only". ` +
+        `Permission was revoked on attempt ${state.permission.epoch - 1}, and the remaining pages began rebuilding ` +
+        `the record from zero. That is the design working, not the run failing.`,
+    ),
   ];
-  const rebuilding = run.status === "done" && state.permission.epoch > 1 && state.permission.state === "SHADOW";
-  if (rebuilding) {
-    parts.push(
+}
+
+/** What each answer to "does this configuration clear the bar?" means, and what to do about it. */
+const QUALIFICATIONS = {
+  clears: {
+    title: "Clears the bar",
+    meaning: ({ lower }) =>
+      `The worst its accuracy could plausibly be is ${pct(lower)}, at or above the bar. Worth deploying — where it ` +
+      "still starts with no permission, and has to earn it again from real reports.",
+  },
+  not_yet: {
+    title: "Not yet",
+    meaning: ({ lower }) =>
+      lower === null
+        ? "No phishing call has been judged yet, so there is nothing to measure."
+        : "The bar sits inside that range, so these pages can't settle it either way. More labelled pages would.",
+  },
+  unqualifiable: {
+    title: "Unqualifiable",
+    meaning: ({ upper }) =>
+      `The best its accuracy could plausibly be is ${pct(upper)}, under the bar. More pages won't change that. ` +
+      "Change the model or the prompt — which makes a new configuration, scored from zero.",
+  },
+};
+
+/** The result, first: measured accuracy on the labelled corpus, and whether it clears the bar. */
+function resultPanel({ evaluation, policy, run, scope }) {
+  const { qualification, phishingCalls: calls, allCalls: all } = evaluation;
+  const verdict = QUALIFICATIONS[qualification];
+  const n = calls.right + calls.wrong;
+  const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+  return el(
+    "div",
+    { class: `result-panel ${qualification}` },
+    el(
+      "div",
+      { class: "result-head" },
+      el("span", { class: `qualification ${qualification}` }, verdict.title),
+      run.status === "running" ? el("span", { class: "muted" }, "so far — provisional until every page is scored") : null,
+    ),
+    el(
+      "div",
+      { class: "measured" },
+      el("span", { class: "measured-value" }, n === 0 ? "—" : pct(calls.measured)),
       el(
-        "p",
-        { class: "hint" },
-        `This run ended part-way through starting over, which is why it finishes at "recommends only". ` +
-          `Permission was revoked on attempt ${state.permission.epoch - 1}, and the remaining pages began rebuilding ` +
-          `the record from zero. That is the design working, not the run failing.`,
+        "span",
+        { class: "measured-label" },
+        n === 0 ? "measured accuracy" : `measured accuracy — ${calls.right} of ${plural(n, "phishing call")} right`,
       ),
-    );
-  }
-  return el("div", { class: "run" }, ...parts);
+    ),
+    n === 0
+      ? null
+      : el(
+          "p",
+          {},
+          `Its true accuracy is plausibly between ${pct(calls.lower)} and ${pct(calls.upper)}. `,
+          `To clear the bar, the lower end must reach ${pct(policy.requiredScore)}.`,
+        ),
+    el("p", {}, verdict.meaning(calls)),
+    el(
+      "p",
+      { class: "muted" },
+      `Across every page: ${all.right} of ${plural(all.judged, "judged verdict")} right, ` +
+        `${plural(all.missedPhishing, "phishing page")} missed, ${plural(all.unusable, "unusable answer")}. ` +
+        "Only phishing calls count towards the bar: being right that a page is harmless is easy, and counting it would flatter the number.",
+    ),
+    el(
+      "p",
+      { class: "muted scope" },
+      `Configuration scored: ${scope.modelId} · prompt ${scope.promptHash.slice(0, 12)} · policy ${scope.policyHash.slice(0, 12)}`,
+    ),
+  );
 }
 
 /**
@@ -304,7 +415,7 @@ function runProgress(run, state) {
  * a row of dashes reads as a broken status bar — so until there is, it says plainly what is
  * missing and what would change it.
  */
-function standing(state) {
+function recordPanel(state) {
   const { permission, policy } = state;
   if (permission.right + permission.wrong > 0) {
     return [
@@ -343,7 +454,7 @@ function standing(state) {
       el(
         "p",
         { class: "muted" },
-        `Starting from nothing, ${needed} confirmed-correct phishing verdicts clear the bar, and ${policy.probationLength} more in a row after that before Warden may act alone. That is the point of the bar, and why the demo exists.`,
+        `Starting from nothing, ${needed} confirmed-correct phishing verdicts clear the bar, and ${policy.probationLength} more in a row after that before Warden may act alone. That is the point of the bar.`,
       ),
     ),
   ];
@@ -372,12 +483,23 @@ function ladder(state) {
         "li",
         { class: classes.join(" ") },
         el("span", { class: "rung-name" }, name),
-        el("span", { class: "rung-note" }, state.permission.state === key ? "← it is here now" : note),
+        el("span", { class: "rung-note" }, state.permission.state === key ? hereNote(state) : note),
       );
       if (index === rungs.length - 1) return [rung];
       return [rung, el("li", { class: "gate", "aria-hidden": "true" }, el("span", {}, index === 0 ? "73 confirmed correct" : "10 more in a row"))];
     }),
   );
+}
+
+/** The marker on the rung it stands on, saying so when that rung is as high as the evidence allows. */
+function hereNote(state) {
+  if (standingOf(state) !== "UNQUALIFIABLE") return "← it is here now";
+  return "← it is here, and on this evidence the bar is out of reach";
+}
+
+/** The standing the engine reported, falling back to the stored state for an older server. */
+function standingOf(state) {
+  return state.standing ?? state.permission.state;
 }
 
 /** The run as the story it is, so someone who looks away knows what they missed. */
@@ -415,53 +537,21 @@ function story(state, run) {
   );
 }
 
-/**
- * Where the run has been, not only where it ended.
- *
- * The arc finishes back at "recommends only" — permission is revoked near the end and the
- * remaining pages start rebuilding. Anyone who looks only at the final state concludes it
- * never worked, when in fact it earned autonomy, used it, and lost it exactly as designed.
- */
-function journey(state) {
-  const reached = new Set(["SHADOW"]);
-  for (const recorded of state.events) {
-    if (recorded.event.kind === "promoted") reached.add(recorded.event.to);
-  }
-  const blocked = state.decisions.filter((decision) => decision.route.to === "block").length;
-  const revocations = state.events.filter((recorded) => recorded.event.kind === "revoked").length;
-  const undone = state.events.filter((recorded) => recorded.event.kind === "reversed").length;
-
-  const steps = [
-    ["SHADOW", "recommended only"],
-    ["EARNING", "went on trial"],
-    ["AUTONOMOUS", "acted alone"],
-  ].map(([key, label]) =>
-    el("span", { class: reached.has(key) ? `step reached ${key}` : "step" }, reached.has(key) ? `✓ ${label}` : label),
-  );
-
-  const outcome =
-    revocations > 0
-      ? `blocked ${blocked} URL${blocked === 1 ? "" : "s"} on its own, then lost the permission and undid ${undone}`
-      : blocked > 0
-        ? `blocked ${blocked} URL${blocked === 1 ? "" : "s"} on its own, permission intact`
-        : "never earned the right to act";
-
-  return el("div", { class: "journey" }, el("div", { class: "steps" }, steps), el("div", { class: "outcome" }, outcome));
-}
-
 /** The permission at a glance, in plain language, with the bound recomputed from its counts. */
-function summaryTiles({ permission, policy, blocklist }) {
+function summaryTiles(record) {
+  const { permission, policy, blocklist } = record;
   const n = permission.right + permission.wrong;
   const bound = wilson(permission.right, n, policy.z);
   const stillNeeded = correctCallsStillNeeded(permission.right, permission.wrong, policy);
-  const state = STATES[permission.state];
+  const shown = standingOf(record);
+  const state = STATES[shown];
   const attempt =
     permission.epoch > 1 ? `attempt ${permission.epoch} — permission has been revoked ${permission.epoch - 1}×` : "first attempt";
 
   return el(
     "div",
     { class: "tiles" },
-    tile("Can it act alone?", el("span", { class: `state ${permission.state}`, title: state.detail }, state.label), attempt),
+    tile("Can it act alone?", el("span", { class: `state ${shown}`, title: state.detail }, state.label), attempt),
     tile(
       "Accuracy we can prove",
       pct(bound),
@@ -469,11 +559,7 @@ function summaryTiles({ permission, policy, blocklist }) {
       el("progress", { value: bound ?? 0, max: 1 }),
     ),
     tile("Confirmed correct", `${permission.right} of ${n}`, `${permission.wrong} wrong since the last reset`),
-    tile(
-      "Still needed",
-      permission.state === "SHADOW" && stillNeeded !== null ? `${stillNeeded} more` : "none",
-      "correct calls before it could be trusted to act",
-    ),
+    stillNeededTile(shown, stillNeeded),
     tile(
       "Trial progress",
       permission.state === "EARNING" ? `${permission.probation} of ${policy.probationLength}` : "—",
@@ -485,6 +571,18 @@ function summaryTiles({ permission, policy, blocklist }) {
       `${blocklist.length} URL${blocklist.length === 1 ? "" : "s"} blocked right now`,
     ),
   );
+}
+
+/**
+ * How far the bar is. For a record that can't qualify, a count would be true only of an
+ * unbroken run of correct calls from here — so it says the bar is out of reach instead.
+ */
+function stillNeededTile(shown, stillNeeded) {
+  if (shown === "UNQUALIFIABLE") {
+    return tile("Still needed", "out of reach", "the best its accuracy could plausibly be is under the bar");
+  }
+  const value = shown === "SHADOW" && stillNeeded !== null ? `${stillNeeded} more` : "none";
+  return tile("Still needed", value, "correct calls before it could be trusted to act");
 }
 
 /** Promotions, revocations and reversals, each linking to the decision that caused it. */
@@ -594,7 +692,9 @@ function captionFor(view, state) {
   const built = corpus.summary
     ? `These are ${corpus.summary.pages} pages written for this project — ${corpus.summary.techniques} hand-written techniques, expanded into ${corpus.summary.campaigns} campaigns of near-identical pages on different domains, the way a real phishing kit is deployed across many hosts. None is a copy of a real page.`
     : "";
-  if (view === "campaigns") return `${built} Grouped by campaign, since siblings share a technique and nearly always go the same way.`;
+  if (view === "campaigns") {
+    return `${built} Grouped by campaign: siblings share a technique and nearly always go the same way, so a campaign is closer to one piece of evidence than to many.`;
+  }
   if (view === "all") return `${built} Every decision, newest first.`;
   const hidden = state.decisions.length - state.decisions.filter(mattered).length;
   return `${built} Showing only what a reviewer would want: mistakes, rejected answers, pages Warden refused to act on, and blocks that were undone. ${hidden} routine calls are hidden.`;
@@ -652,13 +752,7 @@ function matteredTable(notable, container) {
             "td",
             {},
             el("div", { class: "technique" }, group.technique),
-            group.truth
-              ? el(
-                  "span",
-                  { class: group.truth === "phishing" ? "truth-phishing" : "truth-legitimate" },
-                  group.truth === "phishing" ? "really phishing" : "really legitimate",
-                )
-              : null,
+            truthMark(group.truth),
           ),
           el("td", {}, checkBadge(group.route), " ", el("span", { class: "muted" }, group.outcome)),
           el(
@@ -696,7 +790,16 @@ function campaignTable(decisions) {
   for (const decision of decisions) {
     const page = corpus.byUrl.get(decision.url);
     const key = page?.campaign ?? "unknown";
-    const family = families.get(key) ?? { key, technique: page?.technique ?? "—", pages: 0, right: 0, wrong: 0, blocked: 0, unusable: 0 };
+    const family = families.get(key) ?? {
+      key,
+      technique: page?.technique ?? "—",
+      truth: page?.truth ?? null,
+      pages: 0,
+      right: 0,
+      wrong: 0,
+      blocked: 0,
+      unusable: 0,
+    };
     family.pages++;
     if (decision.label === "right") family.right++;
     if (decision.label === "wrong") family.wrong++;
@@ -718,7 +821,8 @@ function campaignTable(decisions) {
         "tr",
         {},
         el("td", {}, family.key),
-        el("td", { class: "muted" }, family.technique),
+        // What the pages really are, so a wrong call reads as a miss or a false alarm at a glance.
+        el("td", {}, el("div", { class: "muted" }, family.technique), truthMark(family.truth)),
         el("td", {}, String(family.pages)),
         el("td", { class: "label-right" }, String(family.right)),
         el("td", { class: family.wrong > 0 ? "label-wrong" : "muted" }, String(family.wrong)),
@@ -760,12 +864,14 @@ function pageCell(decision) {
   const page = corpus.byUrl.get(decision.url);
   const url = el("div", { class: "url", title: decision.url }, decision.url);
   if (!page) return url;
-  const truth = el(
-    "span",
-    { class: page.truth === "phishing" ? "truth-phishing" : "truth-legitimate" },
-    page.truth === "phishing" ? "really phishing" : "really legitimate",
-  );
-  return [el("div", { class: "technique" }, page.technique), truth, url];
+  return [el("div", { class: "technique" }, page.technique), truthMark(page.truth), url];
+}
+
+/** What a test page really is, or nothing for a page outside the corpus. */
+function truthMark(truth) {
+  if (!truth) return null;
+  if (truth === "phishing") return el("span", { class: "truth-phishing" }, "really phishing");
+  return el("span", { class: "truth-legitimate" }, "really legitimate");
 }
 
 /** The verdict, with the model's own stated confidence shown as just that. */
@@ -816,7 +922,8 @@ function labelCell(decision, onLabel) {
   );
 }
 
-// Demo runs.
+// Scoring a configuration. The API still calls these demo runs: the mechanism underneath is
+// unchanged, and only what the screen says about it is.
 let demoTimer;
 let lastDemoState = null;
 // Measured progress, so "how much longer" is an observation rather than a guess.
@@ -835,25 +942,27 @@ function timeLeft(run) {
 }
 
 $("demo").addEventListener("rerender", () => {
-  if (lastDemoState) renderLedger($("demo"), lastDemoState);
+  if (lastDemoState) renderEvaluation($("demo"), lastDemoState);
 });
 
-/** Shows a demo run and keeps polling it while it runs. */
+/** Shows a scoring run and keeps polling it while it runs. */
 async function watchDemo(runId) {
   clearTimeout(demoTimer);
   const res = await api("GET", `/demo/runs/${encodeURIComponent(runId)}`);
   if (!res.ok) return demoUnavailable(res);
+  // A run that never started has nothing to score; there is nothing to show but the button.
+  if (!res.data.run) return demoUnavailable({ status: 404, data: { message: "That run never started." } });
 
-  lastDemoState = { ...res.data, run: res.data.run ? { ...res.data.run, runId } : res.data.run };
-  renderLedger($("demo"), lastDemoState);
-  const running = res.data.run?.status === "running";
+  lastDemoState = { ...res.data, run: { ...res.data.run, runId } };
+  renderEvaluation($("demo"), lastDemoState);
+  const running = res.data.run.status === "running";
   $("run-demo").disabled = running;
-  $("run-demo").textContent = running ? "Running…" : res.data.run ? "Run it again" : "Run the demo";
-  $("clear-demo").hidden = running || !res.data.run;
+  $("run-demo").textContent = running ? "Scoring…" : "Score it again";
+  $("clear-demo").hidden = running;
   if (running) demoTimer = setTimeout(() => watchDemo(runId), 1500);
 }
 
-/** Explains why a demo run can't be shown, and forgets a run the server doesn't know. */
+/** Explains why a scoring run can't be shown, and forgets a run the server doesn't know. */
 function demoUnavailable(res) {
   $("demo").replaceChildren(el("p", { class: "error" }, explain(res)));
   $("run-demo").disabled = false;
@@ -883,7 +992,7 @@ async function loadLive() {
     return;
   }
   lastLiveState = res.data;
-  showLiveStatus(res.data.permission);
+  showLiveStatus(res.data);
   const waiting = res.data.decisions.filter((decision) => decision.label === null).length;
   $("queue-count").textContent = waiting === 0 ? "" : String(waiting);
   renderLedger($("live"), res.data, { onLabel: labelLive });
@@ -894,11 +1003,13 @@ async function loadLive() {
  * What the live system is allowed to do, in the masthead, colour-coded and on every page.
  * It is the one fact a viewer should never have to go looking for.
  */
-function showLiveStatus(permission) {
-  const state = STATES[permission.state];
+function showLiveStatus(record) {
+  const { permission } = record;
+  const shown = standingOf(record);
+  const state = STATES[shown];
   const mode = $("live-status-mode");
   mode.textContent = state.label;
-  mode.className = `live-status-mode ${permission.state}`;
+  mode.className = `live-status-mode ${shown}`;
   $("live-status").title = `${state.detail}${permission.epoch > 1 ? ` Permission has been revoked ${permission.epoch - 1}×.` : ""}`;
 }
 
@@ -921,15 +1032,15 @@ async function labelLive(decisionId, label) {
   await loadLive();
 }
 
-// Each demo run already gets its own ledger, so running again is the reset. Clearing only
+// Each scoring run already gets its own ledger, so running again is the reset. Clearing only
 // stops showing the old one, and costs nothing.
 $("clear-demo").addEventListener("click", () => {
   store(RUN_KEY, "");
   lastDemoState = null;
   clearTimeout(demoTimer);
-  $("demo").replaceChildren(el("p", { class: "empty" }, "No run yet."));
+  $("demo").replaceChildren(el("p", { class: "empty" }, "Nothing scored yet."));
   $("clear-demo").hidden = true;
-  $("run-demo").textContent = "Run the demo";
+  $("run-demo").textContent = "Score it";
 });
 
 $("reset-live").addEventListener("click", async () => {
@@ -1096,9 +1207,19 @@ function showPage(chosen) {
   window.scrollTo({ top: 0 });
 }
 
-/** The address bar names the page, so a refresh or a shared link lands in the same place. */
-const ROUTES = { "#how-it-works": "nav-about", "#send": "nav-try", "#review": "nav-review", "#demo": "nav-demo" };
+/**
+ * The address bar names the page, so a refresh or a shared link lands in the same place.
+ * The first hash listed for a page is the one its tab sets; "#demo" still works for old links.
+ */
+const ROUTES = {
+  "#how-it-works": "nav-about",
+  "#send": "nav-try",
+  "#review": "nav-review",
+  "#score": "nav-demo",
+  "#demo": "nav-demo",
+};
 
+/** Shows the page the address bar names, or How it works for anything it doesn't. */
 function routeFromHash() {
   showPage(ROUTES[window.location.hash] ?? "nav-about");
 }
