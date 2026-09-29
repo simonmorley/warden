@@ -305,13 +305,14 @@ async function serveAsset(request: Request, env: Env, pathname: string): Promise
 
 /**
  * The dashboard displays attacker-written page text. It renders it as text, and this policy
- * makes sure nothing that slips through could run: same-origin scripts, styles and
+ * makes sure nothing that slips through could run: same-origin scripts, styles, fonts and
  * connections only, nothing inline, no framing.
  */
 const CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
   "script-src 'self'",
   "style-src 'self'",
+  "font-src 'self'",
   "connect-src 'self'",
   "img-src 'self' data:",
   "base-uri 'none'",
