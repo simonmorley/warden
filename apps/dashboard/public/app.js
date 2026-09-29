@@ -611,14 +611,16 @@ function resultPanel({ evaluation, policy, run, scope }) {
       "This judges the configuration, not what it's allowed to do. It grants no permission: section 3 rehearses that, " +
         "and the live system, top right, earns its own under Review.",
     ),
+    // The headline is the lower bound, because that is what the verdict is judged on. The
+    // measured rate is higher and, shown big, reads as though it cleared the bar.
     el(
       "div",
       { class: "measured" },
-      el("span", { class: "measured-value" }, n === 0 ? "—" : pct(calls.measured)),
+      el("span", { class: "measured-value" }, n === 0 ? "—" : boundPct(calls.lower, policy.requiredScore)),
       el(
         "span",
         { class: "measured-label" },
-        n === 0 ? "measured precision" : `measured precision — ${calls.right} of ${plural(n, "phishing call")} right`,
+        `proven precision: the worst it could plausibly be. Needs ${pct(policy.requiredScore)} to clear the bar.`,
       ),
     ),
     n === 0 ? null : interval(calls, policy),
@@ -627,8 +629,8 @@ function resultPanel({ evaluation, policy, run, scope }) {
       : el(
           "p",
           {},
-          `Its true precision is plausibly between ${boundPct(calls.lower, policy.requiredScore)} and ${boundPct(calls.upper, policy.requiredScore)}. `,
-          `To clear the bar, the lower end must reach ${pct(policy.requiredScore)}.`,
+          `Plausible range ${boundPct(calls.lower, policy.requiredScore)} to ${boundPct(calls.upper, policy.requiredScore)}. `,
+          `Measured ${pct(calls.measured)}: ${calls.right} of ${plural(n, "phishing call")} right.`,
         ),
     el("p", {}, verdict.meaning(calls, policy.requiredScore)),
     el(
