@@ -24,6 +24,15 @@ describe("HTTP surface", () => {
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
   });
 
+  // The typeface is served from this Worker, so the page never calls a third party for it.
+  it("lets the dashboard load its fonts from its own origin, and from nowhere else", async () => {
+    const res = await SELF.fetch("https://warden.test/");
+    const csp = res.headers.get("content-security-policy") ?? "";
+
+    expect(csp).toContain("font-src 'self'");
+    expect(csp).not.toMatch(/font-src[^;]*(https?:|\*)/);
+  });
+
   it("answers an unknown path with a JSON 404, not an HTML page or a 500", async () => {
     const res = await SELF.fetch("https://warden.test/no-such-route");
 
