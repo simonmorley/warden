@@ -257,3 +257,55 @@ describe("Ledger: persistence", () => {
     expect(await stub.state()).toEqual(before);
   });
 });
+
+// The Review chart replays the record label by label, so it needs the order they were given in.
+describe("Ledger: judgements", () => {
+  const judge = (stub: LedgerStub, decisionId: string, label: "right" | "wrong") =>
+    stub.label({ decisionId, label, source: "ground_truth", labelledBy: "fixture" });
+
+  it("lists every label in the order it was given, not the order the decisions were made", async () => {
+    const stub = ledger();
+    await stub.open("demo", SCOPE);
+    const first = await submitted(stub, phishing(1));
+    const second = await submitted(stub, phishing(2));
+
+    await judge(stub, second.decisionId, "right");
+    await judge(stub, first.decisionId, "wrong");
+
+    const { judgements } = (await stub.state())!;
+    expect(judgements).toEqual([
+      { decisionId: second.decisionId, label: "right", counted: true, epoch: 1, labelledAt: expect.any(Number) },
+      { decisionId: first.decisionId, label: "wrong", counted: true, epoch: 1, labelledAt: expect.any(Number) },
+    ]);
+  });
+
+  it("says when a judgement could not count, so a replay can leave it out", async () => {
+    const stub = ledger();
+    await stub.open("demo", SCOPE);
+    const legitimate = await submitted(stub, phishing(1, { verdict: "not_phishing" }));
+
+    await judge(stub, legitimate.decisionId, "right");
+
+    expect((await stub.state())!.judgements).toEqual([expect.objectContaining({ counted: false })]);
+  });
+
+  it("replays to exactly the permission's counts once a revocation has started a new epoch", async () => {
+    const stub = ledger();
+    await stub.open("demo", SCOPE);
+    await earnAutonomy(stub);
+    const blocked = await submitted(stub, phishing(100));
+    await judge(stub, blocked.decisionId, "wrong");
+    for (const n of [101, 102]) {
+      const { decisionId } = await submitted(stub, phishing(n, { epochSeen: 2 }));
+      await judge(stub, decisionId, "right");
+    }
+
+    const { judgements, permission } = (await stub.state())!;
+    const current = judgements.filter((judgement) => judgement.counted && judgement.epoch === permission.epoch);
+
+    expect(permission.epoch).toBe(2);
+    expect(judgements).toHaveLength(86);
+    expect(current.filter((judgement) => judgement.label === "right")).toHaveLength(permission.right);
+    expect(current.filter((judgement) => judgement.label === "wrong")).toHaveLength(permission.wrong);
+  });
+});
