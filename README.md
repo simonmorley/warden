@@ -248,21 +248,7 @@ Most of the code-quality rules came from reading what it wrote: guard clauses in
 
 **Where it was good.** It found a contradiction in the PRD before any code existed: one section said a mistake's cost depended on the current state and another said it depended on whether the verdict had been acted on. It proposed the evidence rule while writing the inference adapter's tests. It measured the models rather than guessing, and it noticed from a live run that the cap of three never actually bound in the demo, because every block was being reviewed the instant it was made. The fix, making review lag behind for part of the run, is in the decision log.
 
-**Where I had to correct it.** Plenty of places, and they're the more useful part of the record:
-
-- The first demo ran on a fake model. I wanted every verdict to be real, and it is now.
-- The technical design listed specific tests to write. Test-first matters; a test inventory in a design doc doesn't, so it came out.
-- Three of the seven candidate models scored zero on valid answers. They were fine: our adapter wasn't unwrapping the response shape they return. One fix took them to six out of six.
-- It tested one injection framing, watched a model resist it, and reported that the model "saw through" injection. Against five framings the same model fell for four. That's why the set has seven now.
-- The dashboard had a token field. It shouldn't have, and it doesn't.
-- The first version of the demo ran for two minutes with nothing happening on screen, above a row of tiles that had nothing to report.
-- The original plan for the example pages was to capture live phishing and sanitise it. Claude Code's own safety guardrails stopped that step, and on reflection the guardrail was right: writing pages from techniques is the better design, for the reasons above.
-- Scoring was framed as a "demo", which invited the reading that the model was being trained until it was trusted. It isn't, and the screen now says what it actually is: an evaluation of one configuration, which grants nothing.
-- It rendered a bound of 94.98% as "95.0%" next to a 95.0% bar and a "not yet" verdict. Correct underneath, misleading on screen, and fixed.
-- The scoring screen led with the raw hit rate, 97.9%, in large type beside a "not yet" verdict, which read as a contradiction. It now leads with the lower bound the verdict is actually judged on.
-- The screens were written in the builder's vocabulary: "campaign", "epoch", rejection codes. Recording a walkthrough made that obvious in a minute. They now say what they mean.
-
-Most of those are in `docs/decision-log.md`, dated, with what raised them.
+`docs/decision-log.md` records every design change since the design docs were written, with what raised it.
 
 ## Further reading
 
