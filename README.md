@@ -10,6 +10,10 @@ The permission belongs to one exact combination of model, prompt and policy. Cha
 
 It runs on Cloudflare Workers, with Workers AI doing the classifying and a SQLite-backed Durable Object holding each record.
 
+[![Watch the walkthrough on Vimeo](docs/video.jpg)](https://vimeo.com/1231393392)
+
+A short walkthrough of Warden, on Vimeo.
+
 ## How it works, in one picture
 
 ```text
