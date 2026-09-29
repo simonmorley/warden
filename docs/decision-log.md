@@ -6,6 +6,18 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-29 — The dashboard no longer offers to reset the live record
+
+**Changed.** The "Start over" button is gone from Review. `POST /live/reset` still exists, guarded like every other state change, for an operator or the CLI; the dashboard simply doesn't put it in reach.
+
+**Why.** The live ledger is the record that qualifies a deployment, and a button that wipes it sat one click from the button that judges it. The reason the reset was added — a clean slate between demonstrations — is now served by scoring a configuration, which gets its own throwaway ledger on every run.
+
+**Raised by.** Simon, from a pass through the running app.
+
+**Docs.** None: the technical design describes the endpoint, which is unchanged.
+
+---
+
 ## 2026-09-29 — The demo is an evaluation harness
 
 **Changed.** "Demo run" is now **Score a configuration**, and the screen leads with what the run measured rather than with the permission arc:

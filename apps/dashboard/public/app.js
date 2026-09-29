@@ -116,7 +116,7 @@ function costOf(calls) {
 
 // The corpus: what each test page actually is. Without it the decision feed is a list of
 // near-identical generated URLs with nothing to say what any of them is.
-const corpus = { byUrl: new Map(), summary: null, techniques: [] };
+const corpus = { byUrl: new Map(), byId: new Map(), summary: null, techniques: [] };
 
 /** Loads what the test pages are, and fills the picker. */
 async function loadCorpus() {
@@ -124,9 +124,31 @@ async function loadCorpus() {
   if (!res.ok) return;
   corpus.summary = res.data.summary;
   corpus.techniques = res.data.techniques;
-  for (const page of res.data.pages) corpus.byUrl.set(page.url, page);
+  for (const page of res.data.pages) {
+    corpus.byUrl.set(page.url, page);
+    corpus.byId.set(page.id, page);
+  }
   for (const slot of document.querySelectorAll(".corpus-size")) slot.textContent = String(corpus.summary.pages);
   fillPicker();
+  // Either record may have been drawn before this arrived, with URLs where page names belong.
+  $("live").dispatchEvent(new CustomEvent("rerender"));
+  $("demo").dispatchEvent(new CustomEvent("rerender"));
+}
+
+// Where an example page is served from on this Worker, which is the URL it has when sent from
+// the picker rather than walked in a scoring run.
+const SERVED_EXAMPLE = /^\/corpus\/pages\/([^/]+)\/source$/;
+
+/** The corpus page a decision's URL is, whether by its own URL or the one this Worker serves it at; null for anything else. */
+function pageOf(url) {
+  const known = corpus.byUrl.get(url);
+  if (known) return known;
+  try {
+    const served = SERVED_EXAMPLE.exec(new URL(url).pathname);
+    return served ? (corpus.byId.get(decodeURIComponent(served[1])) ?? null) : null;
+  } catch {
+    return null;
+  }
 }
 
 // The bound is recomputed here, in the browser, from the ledger's own counts and the
@@ -154,6 +176,22 @@ function correctCallsStillNeeded(right, wrong, policy) {
 function pct(value) {
   if (value === null || value === undefined) return "—";
   return `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * A bound as a percentage, with as many decimals as it takes to show which side of the bar
+ * it is on. 94.976% rounds to "95.0%", which next to a 95.0% bar and a "Not yet" reads as a
+ * contradiction; within a tenth of a point of the bar it gets at least two decimals, and more
+ * until the rounded figure falls on the same side as the real one.
+ */
+function boundPct(value, bar) {
+  if (value === null || value === undefined) return "—";
+  const close = Math.abs(value - bar) < 0.001;
+  for (let decimals = close ? 2 : 1; decimals < 6; decimals++) {
+    const shown = Number((value * 100).toFixed(decimals)) / 100;
+    if (value < bar === shown < bar) return `${(value * 100).toFixed(decimals)}%`;
+  }
+  return `${(value * 100).toFixed(6)}%`;
 }
 
 /** "1 page", "2 pages". */
@@ -220,8 +258,8 @@ function tile(label, value, sub, picture, { dim = false } = {}) {
 }
 
 /** The numbers an event was decided on. */
-function tally(t) {
-  return `${t.right} correct of ${t.right + t.wrong} · proven precision ${pct(t.bound)}`;
+function tally(t, bar) {
+  return `${t.right} correct of ${t.right + t.wrong} · proven precision ${boundPct(t.bound, bar)}`;
 }
 
 /** What each change actually means for what Warden may do next. */
@@ -262,19 +300,19 @@ function transition(event) {
 }
 
 /** An event as a headline and the receipt behind it. */
-function describe(recorded, urlOf) {
+function describe(recorded, urlOf, bar) {
   const { event } = recorded;
   switch (event.kind) {
     case "promoted":
-      return [`Permission raised: ${STATES[event.from].label} → ${STATES[event.to].label}`, tally(event.tally)];
+      return [`Permission raised: ${STATES[event.from].label} → ${STATES[event.to].label}`, tally(event.tally, bar)];
     case "demoted":
-      return ["Permission lowered: back to recommending only", tally(event.tally)];
+      return ["Permission lowered: back to recommending only", tally(event.tally, bar)];
     case "probation_restarted":
-      return ["Trial restarted after a wrong call; the evidence still holds.", tally(event.tally)];
+      return ["Trial restarted after a wrong call; the evidence still holds.", tally(event.tally, bar)];
     case "revoked":
       return [
         "Permission revoked — it blocked something legitimate, so counting starts again from zero",
-        `record at that moment: ${tally(event.tally)} · attempt ${event.tally.epoch} → ${event.nextEpoch}`,
+        `record at that moment: ${tally(event.tally, bar)} · attempt ${event.tally.epoch} → ${event.nextEpoch}`,
       ];
     case "reversed":
       return [`Block undone: ${urlOf(recorded.decisionId)}`, "the page was legitimate, so the block was removed"];
@@ -309,7 +347,7 @@ function renderLedger(container, state, { onLabel } = {}) {
   const events =
     climb && state.events.length === 0
       ? null
-      : eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, true);
+      : eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, true, state.policy.requiredScore);
   container.replaceChildren(
     recordPanel(state),
     el("div", { class: "section" }, el("h3", {}, "What changed, and why"), climb, events),
@@ -339,7 +377,7 @@ function climbPanel(state) {
   });
 
   const bar = styled(el("div", { class: "climb-bar-line" }), "bottom", `${policy.requiredScore * 100}%`);
-  const columns = points.map((point, index) => climbColumn(point, index, points.length));
+  const columns = points.map((point, index) => climbColumn(point, index, points.length, policy.requiredScore));
   const chart = el("div", { class: points.length > 40 ? "climb-chart dense" : "climb-chart" }, bar, columns);
 
   return el(
@@ -357,29 +395,30 @@ function climbPanel(state) {
 }
 
 /** One judgement's bar, its height the proven precision after it, its time on hover. */
-function climbColumn(point, index, total) {
+function climbColumn(point, index, total, bar) {
   const last = index === total - 1;
   const classes = ["climb-bar"];
   if (point.judgement.label === "wrong") classes.push("wrong");
   if (last) classes.push("last");
   const at = new Date(point.judgement.labelledAt).toLocaleString();
-  const bar = styled(
+  const column = styled(
     el("div", {
       class: classes.join(" "),
-      title: `Judgement ${index + 1} · ${at} · verdict ${point.judgement.label} · ${point.right} of ${point.right + point.wrong} · proven ${pct(point.bound)}`,
+      title: `Judgement ${index + 1} · ${at} · verdict ${point.judgement.label} · ${point.right} of ${point.right + point.wrong} · proven ${boundPct(point.bound, bar)}`,
     }),
     "height",
     `${point.bound * 100}%`,
   );
-  if (last || total <= LABELLED_BARS) bar.append(el("span", { class: "climb-label" }, pct(point.bound)));
-  return el("div", { class: "climb-col" }, bar);
+  if (last || total <= LABELLED_BARS) column.append(el("span", { class: "climb-label" }, boundPct(point.bound, bar)));
+  return el("div", { class: "climb-col" }, column);
 }
 
 /** The chart in a sentence, for anyone who can't see it. */
 function climbSummary(points, policy) {
   const first = points[0];
   const last = points[points.length - 1];
-  return `Proven precision over ${plural(points.length, "judgement")}, from ${pct(first.bound)} to ${pct(last.bound)}, against a bar of ${pct(policy.requiredScore)}.`;
+  const bar = policy.requiredScore;
+  return `Proven precision over ${plural(points.length, "judgement")}, from ${boundPct(first.bound, bar)} to ${boundPct(last.bound, bar)}, against a bar of ${pct(bar)}.`;
 }
 
 /** Where each state leaves Warden, as the end of a sentence. */
@@ -400,7 +439,7 @@ function changes(state, countedInAttempt) {
   const rows = [
     [
       "now",
-      `Confirmed ${permission.right} of ${plural(n, "phishing verdict")} correct. Proven precision ${pct(bound)}, ` +
+      `Confirmed ${permission.right} of ${plural(n, "phishing verdict")} correct. Proven precision ${boundPct(bound, policy.requiredScore)}, ` +
         `${clears ? "at or above" : "still under"} ${pct(policy.requiredScore)}, so ${STAYS[standingOf(state)]}.`,
     ],
     uncounted > 0
@@ -466,7 +505,7 @@ function renderEvaluation(container, state) {
       ...(state.permission.right + state.permission.wrong > 0 ? [summaryTiles(state)] : []),
       el("h4", {}, "What changed, and why"),
       // Known answers do the confirming here, so the prompt to confirm a verdict doesn't apply.
-      eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false),
+      eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false, state.policy.requiredScore),
     ),
   );
 }
@@ -514,8 +553,8 @@ function rebuildingNote(state) {
 const QUALIFICATIONS = {
   clears: {
     title: "Clears the bar",
-    meaning: ({ lower }) =>
-      `The worst its precision could plausibly be is ${pct(lower)}, at or above the bar. Worth deploying — where it ` +
+    meaning: ({ lower }, bar) =>
+      `The worst its precision could plausibly be is ${boundPct(lower, bar)}, at or above the bar. Worth deploying — where it ` +
       "still starts with no permission, and has to earn it again from real reports.",
   },
   not_yet: {
@@ -527,8 +566,8 @@ const QUALIFICATIONS = {
   },
   unqualifiable: {
     title: "Unqualifiable",
-    meaning: ({ upper }) =>
-      `The best its precision could plausibly be is ${pct(upper)}, under the bar. On the evidence so far, this ` +
+    meaning: ({ upper }, bar) =>
+      `The best its precision could plausibly be is ${boundPct(upper, bar)}, under the bar. On the evidence so far, this ` +
       "model and prompt will not clear the bar. More pages won't change that — a different model or prompt starts a new record.",
   },
 };
@@ -564,10 +603,10 @@ function resultPanel({ evaluation, policy, run, scope }) {
       : el(
           "p",
           {},
-          `Its true precision is plausibly between ${pct(calls.lower)} and ${pct(calls.upper)}. `,
+          `Its true precision is plausibly between ${boundPct(calls.lower, policy.requiredScore)} and ${boundPct(calls.upper, policy.requiredScore)}. `,
           `To clear the bar, the lower end must reach ${pct(policy.requiredScore)}.`,
         ),
-    el("p", {}, verdict.meaning(calls)),
+    el("p", {}, verdict.meaning(calls, policy.requiredScore)),
     el(
       "p",
       { class: "muted" },
@@ -760,7 +799,7 @@ function summaryTiles(record) {
     tile("Can it act alone?", el("span", { class: `state ${shown}`, title: state.detail }, state.label), attempt),
     tile(
       "Precision we can prove",
-      pct(bound),
+      boundPct(bound, policy.requiredScore),
       `needs ${pct(policy.requiredScore)} — the worst its true precision could plausibly be, not its average`,
       meter(bound ?? 0, policy.requiredScore),
     ),
@@ -813,7 +852,7 @@ function stillNeededTile(shown, right, stillNeeded) {
 }
 
 /** Promotions, revocations and reversals, each linking to the decision that caused it. */
-function eventList(events, urlOf, container, hasDecisions) {
+function eventList(events, urlOf, container, hasDecisions, bar) {
   if (events.length === 0) {
     return el(
       "p",
@@ -827,7 +866,7 @@ function eventList(events, urlOf, container, hasDecisions) {
     "ul",
     { class: "events" },
     events.map((recorded) => {
-      const [headline, receipt] = describe(recorded, urlOf);
+      const [headline, receipt] = describe(recorded, urlOf, bar);
       return el(
         "li",
         { class: recorded.event.kind },
@@ -887,7 +926,7 @@ function decisionFeed(state, view, container, onLabel) {
 
   const showing =
     view === "campaigns"
-      ? new Set(decisions.map((d) => corpus.byUrl.get(d.url)?.campaign ?? "unknown")).size
+      ? new Set(decisions.map((d) => pageOf(d.url)?.campaign ?? "unknown")).size
       : (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
   const label =
     view === "campaigns"
@@ -949,9 +988,9 @@ function viewButton(id, label, current, container) {
 }
 
 /** A table in the feed's frame, scrolling sideways on its own when the screen is narrow. */
-function feedTable(headings, rows) {
+function feedTable(headings, rows, kind = "") {
   const head = el("thead", {}, el("tr", {}, headings.map((t) => el("th", {}, t))));
-  return el("div", { class: "feed" }, el("table", {}, head, el("tbody", {}, rows)));
+  return el("div", { class: "feed" }, el("table", { class: kind }, head, el("tbody", {}, rows)));
 }
 
 /**
@@ -961,7 +1000,7 @@ function feedTable(headings, rows) {
 function matteredTable(notable, container) {
   const groups = new Map();
   for (const decision of notable) {
-    const page = corpus.byUrl.get(decision.url);
+    const page = pageOf(decision.url);
     const outcome = outcomeOf(decision);
     const key = `${page?.campaign ?? "unknown"}|${outcome}`;
     const group = groups.get(key) ?? {
@@ -1016,7 +1055,7 @@ function outcomeOf(decision) {
 function campaignTable(decisions) {
   const families = new Map();
   for (const decision of decisions) {
-    const page = corpus.byUrl.get(decision.url);
+    const page = pageOf(decision.url);
     const key = page?.campaign ?? "unknown";
     const family = families.get(key) ?? {
       key,
@@ -1058,6 +1097,7 @@ function decisionTable(shown, onLabel) {
   return feedTable(
     ["Page", "Verdict", "Evidence cited", "Outcome", "Block", "Confirmed"],
     shown.map((decision) => feedRow(decision, onLabel)),
+    "decisions",
   );
 }
 
@@ -1077,8 +1117,8 @@ function feedRow(decision, onLabel) {
 
 /** What the page is, with its URL underneath. A known test page says what it really is. */
 function pageCell(decision) {
-  const page = corpus.byUrl.get(decision.url);
-  const url = el("div", { class: "url", title: decision.url }, decision.url);
+  const page = pageOf(decision.url);
+  const url = el("div", { class: page ? "url secondary" : "url", title: decision.url }, decision.url);
   if (!page) return url;
   return [el("div", { class: "technique" }, page.technique), truthMark(page.truth), url];
 }
@@ -1256,16 +1296,6 @@ async function labelLive(decisionId, label) {
   );
   await loadLive();
 }
-
-$("reset-live").addEventListener("click", async () => {
-  const waiting = lastLiveState?.decisions.length ?? 0;
-  if (waiting > 0 && !confirm(`Delete this record? ${waiting} decision${waiting === 1 ? "" : "s"} and everything Warden has earned here will be gone.`)) {
-    return;
-  }
-  const res = await api("POST", "/live/reset");
-  showBanner(res.ok ? "Record cleared. Warden starts again with no permission to act." : explain(res), res.ok ? "info" : "error");
-  await loadLive();
-});
 
 // Sending Warden a page.
 
