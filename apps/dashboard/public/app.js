@@ -674,14 +674,7 @@ function interval(calls, policy) {
  */
 function recordPanel(state) {
   const { permission, policy } = state;
-  if (permission.right + permission.wrong > 0) {
-    return el(
-      "div",
-      { class: "record" },
-      summaryTiles(state),
-      el("p", { class: "record-note" }, "Proven precision is recomputed in your browser from the counts above, using the server's own policy."),
-    );
-  }
+  if (permission.right + permission.wrong > 0) return el("div", { class: "record" }, summaryTiles(state));
 
   const classified = state.decisions.length;
   const waiting = state.decisions.filter((decision) => decision.label === null).length;
