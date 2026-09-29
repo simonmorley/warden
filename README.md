@@ -31,7 +31,7 @@ Nothing is trained. The model and prompt never change. Reviewed outcomes move th
 You need Node 22 or later and a Cloudflare account. The free plan is enough.
 
 ```sh
-git clone <this repository>
+git clone https://github.com/simonmorley/warden.git
 cd warden
 npm install
 cp apps/worker/.dev.vars.example apps/worker/.dev.vars
@@ -235,3 +235,7 @@ Most of those are in `docs/decision-log.md`, dated, with what raised them.
 - `docs/decision-log.md` records every change since the design, newest first.
 - `packages/fixtures/README.md` covers how the example pages were written, the safety rules, and what the traps found.
 - `CLAUDE.md` holds the rules the build ran under.
+
+## Licence
+
+MIT, in `LICENSE`. The IBM Plex fonts the dashboard ships are under the SIL Open Font License, alongside them in `apps/dashboard/public/fonts/`.

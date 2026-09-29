@@ -1,6 +1,7 @@
 {
   "name": "warden",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Phishing triage where the AI has to earn the right to act.",
   "workspaces": [
