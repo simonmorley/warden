@@ -477,18 +477,18 @@ function placeholders() {
 
 /**
  * Renders a scoring run as the evaluation it is: the result first, then the result broken
- * down by campaign, then — set apart — what that precision would do to permission on live
+ * down by page design, then — set apart — what that precision would do to permission on live
  * traffic, rehearsed on the run's own throwaway ledger.
  */
 function renderEvaluation(container, state) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
-  // By campaign is the result; the other views are there to dig into it.
+  // By design is the result broken down; the other views are there to dig into it.
   const view = views.get(container.id) ?? "campaigns";
   container.replaceChildren(
     runStatus(state.run, state),
     el("div", { class: "section-eyebrow" }, "1 · The answer: is this model, prompt and policy good enough?"),
     resultPanel(state),
-    el("div", { class: "section-eyebrow" }, "2 · The same answer, campaign by campaign"),
+    el("div", { class: "section-eyebrow" }, "2 · Where it was right and where it was wrong"),
     decisionFeed(state, view, container),
     el(
       "div",
@@ -960,7 +960,7 @@ function decisionFeed(state, view, container, onLabel) {
       : (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
   const label =
     view === "campaigns"
-      ? `Decisions — ${plural(showing, "campaign")}, ${plural(decisions.length, "page")}`
+      ? `Decisions — ${plural(decisions.length, "page")}, ${plural(showing, "design")}`
       : `Decisions — showing ${showing} of ${decisions.length}`;
   const heading = el(
     "div",
@@ -969,7 +969,7 @@ function decisionFeed(state, view, container, onLabel) {
     el(
       "div",
       { class: "views", role: "group", "aria-label": "How much to show" },
-      viewButton("campaigns", "By campaign", view, container),
+      viewButton("campaigns", "By design", view, container),
       viewButton("mattered", "What mattered", view, container),
       viewButton("all", "Everything", view, container),
     ),
@@ -989,15 +989,33 @@ function feedBody(decisions, view, container, onLabel) {
 
 /** Explains what the current view shows, and where these pages came from. */
 function captionFor(view, state) {
-  const built = corpus.summary
-    ? `These are ${corpus.summary.pages} pages written for this project — ${corpus.summary.techniques} hand-written techniques, expanded into ${corpus.summary.campaigns} campaigns of near-identical pages on different domains, the way a real phishing kit is deployed across many hosts. None is a copy of a real page.`
-    : "";
+  const built = corpusInWords();
   if (view === "campaigns") {
-    return `${built} Grouped by campaign: siblings share a technique and nearly always go the same way, so a campaign is closer to one piece of evidence than to many.`;
+    return `${built} One row per design, with its copies counted together. Copies of the same page nearly always get the same answer.`;
   }
   if (view === "all") return `${built} Every decision, newest first.`;
   const hidden = state.decisions.length - state.decisions.filter(mattered).length;
   return `${built} Showing only what a reviewer would want: mistakes, rejected answers, pages Warden refused to act on, and blocks that were undone. ${hidden} routine calls are hidden.`;
+}
+
+/**
+ * What the test pages are, in plain words, counted from the pages themselves: how many phishing
+ * designs, how many copies of each, and how many one-offs, without security jargon: what the
+ * trade calls a campaign is said here as a design and its copies.
+ */
+function corpusInWords() {
+  if (!corpus.summary) return "";
+  const sizes = new Map();
+  for (const page of corpus.byId.values()) sizes.set(page.campaign, (sizes.get(page.campaign) ?? 0) + 1);
+  const copied = [...sizes.values()].filter((size) => size > 1);
+  const oneOffs = [...sizes.values()].filter((size) => size === 1).length;
+  const copies = copied.length > 0 ? Math.max(...copied) : 0;
+  return (
+    `${corpus.summary.pages} test pages, all written for this project: none is copied from real phishing. ` +
+    `${plural(copied.length, "fake page design")}, each copied onto ${copies} different made-up web addresses, the way ` +
+    `attackers put one fake page up on many sites at once. The other ${oneOffs} pages are one-offs: real-looking ` +
+    `legitimate pages, harmless pages, and the traps.`
+  );
 }
 
 /** One of the three view switches. */
@@ -1081,7 +1099,7 @@ function outcomeOf(decision) {
   return decision.label === "right" ? "verdict was correct" : "awaiting judgement";
 }
 
-/** One row per campaign: the padding collapsed into counts. */
+/** One row per page design, its copies collapsed into counts. */
 function campaignTable(decisions) {
   const families = new Map();
   for (const decision of decisions) {
@@ -1119,7 +1137,7 @@ function campaignTable(decisions) {
       el("td", { class: "num muted" }, String(family.unusable)),
     ),
   );
-  return feedTable(["Campaign", "Technique", "Pages", "Correct", "Wrong", "Blocked", "Unusable"], rows);
+  return feedTable(["Design", "What it is", "Pages", "Correct", "Wrong", "Blocked", "Unusable"], rows);
 }
 
 /** The decision table, newest first. */
