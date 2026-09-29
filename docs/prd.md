@@ -154,6 +154,24 @@ A flawless run needs 73 confirmed-correct calls. One mistake and it needs 110, t
 - **Independence.** Wilson assumes independent samples. One phishing kit deployed across many URLs is one piece of evidence, not many, so counting pages overstates what has been proven. Production would count clusters or campaigns rather than pages.
 - **Population.** A templated fixture set demonstrates the mechanism. It does not measure the classifier's accuracy on real traffic, and nothing here should be read as if it did.
 
+### 6.3 When the bar is out of reach
+
+The lower bound says when a record has proved enough. It can't say when a record never will. A classifier that is right 90% of the time sits in SHADOW for ever against a 95% bar: its lower bound creeps up towards 90% and stops there, and nothing on screen distinguishes it from one that simply hasn't seen enough pages yet.
+
+The **Wilson upper bound** answers that: the best the true accuracy could plausibly be. Same formula, sign flipped. Once it falls below the bar, the record is **unqualifiable on this evidence**, and Warden reports the standing as **UNQUALIFIABLE**.
+
+| Track record | Floor | Ceiling | Against a 95% bar |
+| --- | --- | --- | --- |
+| 63 right out of 70 (90%) | 80.8% | 95.1% | Not yet — 95% is still plausible |
+| **72 out of 80 (90%)** | **81.5%** | **94.8%** | **Unqualifiable** |
+| 73 out of 73 | 95.0% | 100% | Clears |
+
+So a record against the bar has three answers, not two: **clears**, **not yet**, or **unqualifiable**.
+
+UNQUALIFIABLE is reported, not stored. It is SHADOW whose counts put the ceiling under the bar, and it routes exactly as SHADOW does: everything to a human, nothing earned. It is not absorbing — a long enough run of correct calls lifts the ceiling back over the bar — and neither EARNING nor AUTONOMOUS can be in it, since both got there by clearing the bar. What it changes is what an operator should do: not wait, but change the model or the prompt, which starts a new permission from zero (section 4).
+
+The repeated-checking caveat in 6.2 applies here in reverse: checking the ceiling after every result makes ruling out a good classifier by bad luck more likely than the 97.5% suggests.
+
 ## 7. How permission is lost
 
 ### 7.1 Mistakes are judged by what they cost
@@ -333,7 +351,7 @@ Priority order, most important first: the permission lifecycle, reversal of a wr
 
 Everything marked optional in section 10 can go without weakening the argument, and the dashboard can be plain. What can't be cut is the boundary: a verdict must never authorise its own action, and a confirmed mistake must always be able to undo one.
 
-## Appendix — the Wilson lower bound
+## Appendix — the Wilson bounds
 
 ```
 p = right / n
@@ -341,5 +359,11 @@ lower = (p + z²/2n − z·√(p(1−p)/n + z²/4n²)) / (1 + z²/n)
 ```
 
 With `z = 1.96`: the two-sided 95% value, so this is a 97.5% one-sided bound (see 6.2). Return "insufficient evidence" at n = 0.
+
+The upper bound (section 6.3) is the same expression with the sign in front of the root flipped:
+
+```
+upper = (p + z²/2n + z·√(p(1−p)/n + z²/4n²)) / (1 + z²/n)
+```
 
 When every call is correct this simplifies to `n / (n + z²)`, so a perfect run is purely a question of volume, and 73 is simply where that curve crosses 0.95.

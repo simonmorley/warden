@@ -33,7 +33,7 @@ JSON shapes live in one shared types module, imported by the Worker, the fixture
 
 The whole of the PRD's sections 5, 6 and 7, as pure functions over values. Time is a parameter, never a call.
 
-**Responsibilities.** The Wilson lower bound. Which verdicts count and which are excluded. The state machine, including probation restarts, the drop from AUTONOMOUS when late labels pull the bound under the bar, and epoch changes. The unreviewed-action cap.
+**Responsibilities.** The Wilson lower and upper bounds, and qualifying a record against the bar as clears, not yet or unqualifiable. The reported standing, which is SHADOW shown as UNQUALIFIABLE when the ceiling is under the bar. Which verdicts count and which are excluded. The state machine, including probation restarts, the drop from AUTONOMOUS when late labels pull the bound under the bar, and epoch changes. The unreviewed-action cap.
 
 **Guarantees.** It returns decisions and the events they imply — never effects. "Revoke, and reverse action X" is a value it hands back; something else performs it. Given the same inputs it returns the same output, every time, with no hidden state.
 

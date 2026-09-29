@@ -6,6 +6,20 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
+## 2026-09-29 — The upper bound, and a record that can't qualify
+
+**Changed.** The engine computes the Wilson upper bound alongside the lower, and qualifies a track record against the bar as one of three things: **clears**, **not yet**, or **unqualifiable**. A SHADOW record whose ceiling is under the bar is reported as **UNQUALIFIABLE**.
+
+**Why.** With only a floor, a classifier that is good but not good enough looks identical to one that needs more pages. A 90% classifier against a 95% bar would sit in SHADOW indefinitely, its floor creeping towards 90% and stopping, and nothing would say it was never going to get there. The ceiling says it: at 72 right out of 80 the best its true accuracy could plausibly be is 94.8%, and waiting won't help. The right move is to change the model or prompt, which starts a new permission anyway.
+
+**Why derived rather than a fourth state.** It routes exactly as SHADOW does, so the state machine has nothing to do differently. It isn't absorbing: enough correct calls lift the ceiling back over the bar, so storing it would mean re-deriving it on every label anyway. And EARNING and AUTONOMOUS can never be in it, since both were reached by clearing the bar. So `standing()` reports it from the counts, the ledger's schema is untouched, and no migration was needed.
+
+**Raised by.** Simon.
+
+**Docs.** PRD §6.3 (new) and the appendix; technical design §3A.
+
+---
+
 ## 2026-09-28 — Injection works in one direction only, and the demo's ending depends on it
 
 **Found.** Running the whole set through the chosen model:
