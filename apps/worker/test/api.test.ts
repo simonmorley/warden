@@ -242,4 +242,10 @@ describe("GET /live", () => {
     });
     expect(state["decisions"]).toHaveLength(1);
   });
+
+  it("reports the standing the engine derives, so a record that can't reach the bar says so", async () => {
+    const res = await call(appWith(phishing), "GET", "/live", { token: null });
+
+    expect(await res.json()).toMatchObject({ standing: "SHADOW" });
+  });
 });

@@ -99,6 +99,20 @@ describe("the demo run API", () => {
     expect(await watched.json()).toMatchObject({ kind: "demo", scope: { modelId: SCOPE.modelId }, run: { status: "running" } });
   });
 
+  it("reports a run as an evaluation of its configuration, and its throwaway permission's standing", async () => {
+    const { runId } = await (await post("/demo/runs")).json<{ runId: string }>();
+    const watched = await (await get(`/demo/runs/${runId}`)).json();
+
+    expect(watched).toMatchObject({
+      standing: "SHADOW",
+      evaluation: {
+        qualification: "not_yet",
+        phishingCalls: { right: 0, wrong: 0, measured: null },
+        allCalls: { classified: 0 },
+      },
+    });
+  });
+
   it("gives each run its own ledger", async () => {
     const first = await (await post("/demo/runs")).json<{ runId: string }>();
     const second = await (await post("/demo/runs")).json<{ runId: string }>();
