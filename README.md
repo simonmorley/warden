@@ -14,6 +14,28 @@ It runs on Cloudflare Workers, with Workers AI doing the classifying and a SQLit
 
 A short walkthrough of Warden, on Vimeo.
 
+## What it does
+
+1. **A URL is reported.** Warden fetches the page, treating the address as hostile input.
+2. **It extracts signals.** 27 structural facts, checked by code rather than by the model: where the form posts, whether the brand on the page matches the host, whether it asks for a wallet's recovery phrase, and so on.
+3. **The model gives a verdict.** Llama 3.3 70B on Workers AI answers phishing, not phishing or unsure, and has to cite signals that were actually found. A verdict pointing at nothing is rejected.
+4. **A permission check decides what happens.** It's arithmetic the model can't reach. The verdict either blocks the URL now or goes to a reviewer, depending only on the record this exact configuration has earned.
+5. **A reviewer confirms or corrects it.** That's the only thing that moves the record. A wrong automatic block is undone on the spot, and the permission goes with it.
+
+Before any of that, you can **score a configuration**: run 154 pages with known answers through the live model and find out whether this model, prompt and policy are good enough to be worth deploying at all.
+
+## Why this problem
+
+Abuse teams are in a race. A phishing page does its damage in the hours it's up, and human review is the queue it waits in. A model can close that gap, but letting it act alone moves the risk somewhere worse: a false positive takes down a legitimate site, at machine speed, and attackers can manufacture false positives on purpose by planting accusations on a page they want removed. So the useful question isn't "how accurate is the model?" but "when may it act on its own, and how quickly does that stop when it's wrong?"
+
+To decide what the test pages should cover, we took 300 URLs from the OpenPhish community feed and read the copies urlscan.io already held, contacting no live phishing site:
+
+- **41 of the 300 were on `pages.dev` or `workers.dev`:** Cloudflare's own free hosting. Abuse of the platform you're defending is the normal case.
+- **6 of the 17 readable pages sent their form by script with no form target,** which is why "form without action" is its own signal.
+- **Nothing flagged a page asking for a wallet's recovery phrase,** the most valuable thing a wallet lure can steal. Warden has a signal for it now.
+
+The example pages are written from those techniques. None is a copy of a real page.
+
 ## How it works, in one picture
 
 ```text
@@ -54,7 +76,12 @@ That's the whole setup. A few notes on what those steps are doing:
 The dashboard has four screens:
 
 1. **How it works.** The idea on one page.
-2. **Score a configuration.** Start here. It runs 154 pages whose real answers are known through the live model and tells you whether this model, prompt and policy clear the bar, not yet, or can't. Then it replays the same pages through the permission rules on a throwaway ledger, so you can watch permission being earned, used, and lost to a page that tricks the model. It takes two to three minutes.
+2. **Score a configuration.** Start here. It runs 154 pages with known answers through the live model, in two to three minutes. The page shows three things, in order:
+   - **The answer:** proven precision against the 95% bar, and whether the configuration clears it, not yet, or can't.
+   - **What it got wrong.**
+   - **A rehearsal:** the same pages replayed through the permission rules on a throwaway ledger, so you can watch permission being earned, used, and lost to a page that tricks the model.
+
+   Each run has its own link (`#score/<run id>`), and the page reopens the latest run in any browser.
 3. **Send a page.** Give it a URL, or pick one of the example pages, and see every step: what was extracted, what the model said, whether its evidence held up, and what it was allowed to do.
 4. **Review.** Confirm whether each verdict was right. This is the only thing that moves the live record.
 
@@ -121,7 +148,7 @@ To route model calls through your own AI Gateway, add `AI_GATEWAY_ID` to the Wor
 | --- | --- |
 | **Workers** | The whole application: HTTP API, fetching, inference, and serving the dashboard. One Worker. |
 | **Workers AI** | The classifier, `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, called with JSON mode at temperature 0. |
-| **Durable Objects (SQLite)** | One object per record. The live record is one; every scoring run gets its own. Each holds its permission, decisions, labels, blocks and history in its own database, with versioned migrations. |
+| **Durable Objects (SQLite)** | `Ledger`: one object per record. The live record is one, and every scoring run gets its own. Each holds its permission, decisions, labels, blocks and history in its own database, with versioned migrations. `RunIndex`: a short ordered list of scoring runs, so the latest can be found from any browser. |
 | **Static Assets** | The dashboard, served through the `ASSETS` binding with the Worker seeing every request first, so routing and security headers are identical in tests, locally and in production. |
 | **AI Gateway** | Optional. Logs and rate-limits model calls when `AI_GATEWAY_ID` is set. |
 | **Workers Observability** | Logs and traces, on in the config. |
@@ -136,6 +163,7 @@ Three that aren't used, and why. **Browser Rendering** is the obvious next step:
 | `GET` | `/live` | — | The live record: permission, decisions, history, and every judgement in order |
 | `POST` | `/live/labels` | yes | Confirm a verdict: `{ "decisionId", "label": "right" \| "wrong" }` |
 | `POST` | `/demo/runs` | yes | Start scoring a configuration. Returns a run id |
+| `GET` | `/demo/runs/latest` | — | The id of the scoring run started most recently |
 | `GET` | `/demo/runs/:id` | — | A scoring run: its result, its rehearsal ledger and its progress |
 | `GET` | `/corpus` | — | What the example pages are |
 | `GET` | `/corpus/pages/:id` | — | One example page, with what it really is |
@@ -184,7 +212,9 @@ The PRD and technical design in `docs/` have the full reasoning, and `docs/decis
 
 ## What running it showed
 
-Two findings that go beyond the project.
+**The chosen configuration sits right on the bar.** Across four full runs it made two or three false positives in 141 to 143 phishing verdicts, and never missed a phishing page. Every false positive was a trap. Its proven precision came out between 93.9% and 95.01%. One run cleared the bar and three didn't. At this set's size, a single mistake decides the verdict, which is the honest answer: 154 pages can say it's close, and can't say it's proven.
+
+Two findings go beyond the project.
 
 **Prompt injection only worked in one direction.** Every page that told the model "I'm legitimate" was still called phishing, 14 out of 14. The attacks that worked were the other way round: a legitimate page carrying a third party's claim that it was malicious, like a forum post, a review or an issue tracker. The exploitable direction produces false positives, which is exactly the harm Warden is built to bound, and it's the direction most injection defences aren't looking at.
 
@@ -195,7 +225,7 @@ Two findings that go beyond the project.
 ## Limitations
 
 - **The example pages demonstrate the mechanism. They don't measure accuracy on real traffic.** They have a technique's structure but not its craft. A score on them says whether the classifier reads structure, not how it would do on a live queue.
-- **Pages aren't independent.** One phishing kit across many domains is closer to one piece of evidence than many, and the bound counts pages. A real deployment would count campaigns.
+- **Pages aren't independent.** One phishing kit across many domains is closer to one piece of evidence than many, and the bound counts pages. A real deployment would count kits, not pages.
 - **Checking the bar after every result makes a lucky pass likelier than 95% suggests.** A sequential test would fix that, and would still be arithmetic.
 - **A plain fetch sees the HTML as served.** No scripts run, and cloaking works. That's Browser Rendering's job, and it isn't built.
 - **Blocks are simulated.** A blocklist entry and a log line. Nothing leaves the system.
@@ -229,6 +259,8 @@ Most of the code-quality rules came from reading what it wrote: guard clauses in
 - The original plan for the example pages was to capture live phishing and sanitise it. Claude Code's own safety guardrails stopped that step, and on reflection the guardrail was right: writing pages from techniques is the better design, for the reasons above.
 - Scoring was framed as a "demo", which invited the reading that the model was being trained until it was trusted. It isn't, and the screen now says what it actually is: an evaluation of one configuration, which grants nothing.
 - It rendered a bound of 94.98% as "95.0%" next to a 95.0% bar and a "not yet" verdict. Correct underneath, misleading on screen, and fixed.
+- The scoring screen led with the raw hit rate, 97.9%, in large type beside a "not yet" verdict, which read as a contradiction. It now leads with the lower bound the verdict is actually judged on.
+- The screens were written in the builder's vocabulary: "campaign", "epoch", rejection codes. Recording a walkthrough made that obvious in a minute. They now say what they mean.
 
 Most of those are in `docs/decision-log.md`, dated, with what raised them.
 
