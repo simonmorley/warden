@@ -39,7 +39,6 @@ const ROUTES: readonly Route[] = [
   { pattern: /^\/classify$/, handlers: { POST: { auth: true, run: classifyPage } } },
   { pattern: /^\/live$/, handlers: { GET: { auth: false, run: readLive } } },
   { pattern: /^\/live\/labels$/, handlers: { POST: { auth: true, run: labelLive } } },
-  { pattern: /^\/live\/reset$/, handlers: { POST: { auth: true, run: resetLive } } },
   { pattern: /^\/corpus$/, handlers: { GET: { auth: false, run: readCorpus } } },
   { pattern: /^\/corpus\/pages\/([^/]+)$/, handlers: { GET: { auth: false, run: readCorpusPage } } },
   { pattern: /^\/corpus\/pages\/([^/]+)\/source$/, handlers: { GET: { auth: false, run: serveCorpusPage } } },
@@ -276,16 +275,6 @@ async function watchDemoRun(
     standing: standing(state.permission, DEFAULT_POLICY),
     evaluation: evaluate(state.decisions, DEFAULT_POLICY),
   });
-}
-
-/** Empties the live record, so a demonstration can start over without stale history. */
-async function resetLive(_request: Request, env: Env, dependencies: Dependencies): Promise<Response> {
-  const model = dependencies.model(env);
-  if (!model) return noModel();
-  const scope = await currentScope(model.id);
-  const name = dependencies.liveLedgerName(await scopeHash(scope));
-  await env.LEDGER.get(env.LEDGER.idFromName(name)).reset();
-  return json({ reset: true });
 }
 
 async function openLive(env: Env, dependencies: Dependencies, scope: Scope) {

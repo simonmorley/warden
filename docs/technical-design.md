@@ -130,7 +130,7 @@ Thin. One shared types module defines every request and response shape.
 | `POST` | `/live/labels` | token | Apply a human label to a live decision |
 | `GET` | `/` | — | Dashboard |
 
-**Guarantees.** Every endpoint that changes state or spends inference requires the token, compared in constant time. Malformed bodies return a useful error rather than a 500. A demo run needs no reset, since each run is a new ledger; the live record has one, for the demonstration rather than the mechanism.
+**Guarantees.** Every endpoint that changes state or spends inference requires the token, compared in constant time. Malformed bodies return a useful error rather than a 500. Nothing resets a record. A scoring run needs none, since each run is a new ledger, and the live record is permanent: it is what a deployment's permission rests on.
 
 ### G. Demo driver
 

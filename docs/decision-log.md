@@ -6,15 +6,17 @@ Each entry records what changed, why, what raised it, and which docs were update
 
 ---
 
-## 2026-09-29 — The dashboard no longer offers to reset the live record
+## 2026-09-29 — The live record has no reset
 
-**Changed.** The "Start over" button is gone from Review. `POST /live/reset` still exists, guarded like every other state change, for an operator or the CLI; the dashboard simply doesn't put it in reach.
+**Changed.** `POST /live/reset` is gone, along with the ledger method behind it and the "Start over" button on Review. The live record can no longer be emptied over HTTP; a test now holds it to that.
 
-**Why.** The live ledger is the record that qualifies a deployment, and a button that wipes it sat one click from the button that judges it. The reason the reset was added — a clean slate between demonstrations — is now served by scoring a configuration, which gets its own throwaway ledger on every run.
+**Why.** The live ledger is the record a deployment's permission rests on, and a real one is meant to be permanent — which is where the technical design started before the reset was added (see "A reset, for the demonstration rather than the mechanism", below). What the reset was for, a clean slate between demonstrations, is now served by scoring a configuration: every run gets its own throwaway ledger. A button that wiped the record sat one click from the button that judges it.
+
+**How it went.** In two steps. The first removed only the button and kept the endpoint for an operator, on the reading that the request was about the page. Simon asked why the endpoint was still there, and it went too.
 
 **Raised by.** Simon, from a pass through the running app.
 
-**Docs.** None: the technical design describes the endpoint, which is unchanged.
+**Docs.** PRD §13; technical design §3F.
 
 ---
 

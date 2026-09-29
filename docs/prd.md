@@ -324,7 +324,7 @@ The platform helps but is not the argument: a Worker has no route into a private
 
 Nothing learns from a score. The model and prompt are fixed; scoring measures them and changes nothing about them.
 
-One button. Every verdict is a live Workers AI call against the fixture set — nothing is recorded or replayed. Labels stand in for an analyst, taken from each page's hand-set ground truth, and the screen says so. Each run gets a fresh ledger, so runs don't interfere and a run needs no reset. The live ledger has one, for the demonstration rather than the mechanism: without it a few experiments pollute it permanently and the next viewer inherits them.
+One button. Every verdict is a live Workers AI call against the fixture set — nothing is recorded or replayed. Labels stand in for an analyst, taken from each page's hand-set ground truth, and the screen says so. Each run gets a fresh ledger, so runs don't interfere and a run needs no reset. The live ledger has none either: it is the record a deployment's permission rests on, and it is permanent.
 
 Inference runs concurrently ahead of the ledger while submissions stay in fixture order, which keeps a run to a few minutes.
 
