@@ -139,3 +139,46 @@ describe("the demo run API", () => {
     expect((await get("/demo/runs/not-a-run-id")).status).toBe(404);
   });
 });
+
+// A scoring run's id used to live only in the browser that started it, so a new browser had
+// no way back to the results. The server remembers the latest one instead.
+describe("the latest scoring run", () => {
+  const model: Model = { id: SCOPE.modelId, complete: async () => "{}" };
+  const bindings = () => ({ ...env, WARDEN_TOKEN: TOKEN, WARDEN_OPEN: "" });
+  const appFor = () => {
+    const index = `runs:${crypto.randomUUID()}`;
+    return createApp({
+      model: () => model,
+      liveLedgerName: () => `live:${crypto.randomUUID()}`,
+      demoPlan: () => PLAN,
+      runIndexName: () => index,
+    });
+  };
+  const start = async (app: ReturnType<typeof createApp>) => {
+    const res = await app.fetch(
+      new Request("https://warden.test/demo/runs", { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } }),
+      bindings(),
+    );
+    return res.json<{ runId: string }>();
+  };
+  const latest = (app: ReturnType<typeof createApp>) =>
+    app.fetch(new Request("https://warden.test/demo/runs/latest"), bindings());
+
+  it("is a 404 until a run has been started, not an error", async () => {
+    const res = await latest(appFor());
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "not_found" });
+  });
+
+  it("is the run started most recently, and needs no token, so any browser can reopen it", async () => {
+    const app = appFor();
+    await start(app);
+    const { runId } = await start(app);
+
+    const res = await latest(app);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ runId, watch: `/demo/runs/${runId}` });
+  });
+});
