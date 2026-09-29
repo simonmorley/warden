@@ -1,6 +1,7 @@
-import { DEFAULT_POLICY } from "@warden/engine";
+import { DEFAULT_POLICY, standing } from "@warden/engine";
 import { ALL_FIXTURES, SEEDS } from "@warden/fixtures";
 import { pageIdentity } from "@warden/signals";
+import { evaluate } from "./evaluation";
 import { authorised, BadRequest, json, problem, readObject, requireString, runningLocally } from "./http";
 import type { DemoStep } from "./demo";
 import type { Model } from "./inference/classify";
@@ -136,7 +137,9 @@ async function readLive(_request: Request, env: Env, dependencies: Dependencies)
   const model = dependencies.model(env);
   if (!model) return noModel();
   const { stub } = await openLive(env, dependencies, await currentScope(model.id));
-  return json({ ...(await stub.state()), policy: DEFAULT_POLICY });
+  const state = await stub.state();
+  if (!state) throw new Error("the live ledger was opened but reports no state");
+  return json({ ...state, policy: DEFAULT_POLICY, standing: standing(state.permission, DEFAULT_POLICY) });
 }
 
 async function labelLive(request: Request, env: Env, dependencies: Dependencies): Promise<Response> {
@@ -266,7 +269,13 @@ async function watchDemoRun(
   if (!runId || !RUN_ID.test(runId)) return problem(404, "not_found", "There is no such demo run.");
   const state = await env.LEDGER.get(env.LEDGER.idFromName(`demo:${runId}`)).state();
   if (!state || state.kind !== "demo") return problem(404, "not_found", "There is no such demo run.");
-  return json({ ...state, policy: DEFAULT_POLICY });
+  return json({
+    ...state,
+    policy: DEFAULT_POLICY,
+    // The throwaway permission's standing, and what the run measured about the configuration.
+    standing: standing(state.permission, DEFAULT_POLICY),
+    evaluation: evaluate(state.decisions, DEFAULT_POLICY),
+  });
 }
 
 /** Empties the live record, so a demonstration can start over without stale history. */
