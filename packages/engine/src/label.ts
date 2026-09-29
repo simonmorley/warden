@@ -1,4 +1,5 @@
 import { initialPermission } from "./permission";
+import { qualify } from "./qualification";
 import type { EngineEvent, Label, LabelledDecision, LabelOutcome, Permission, Policy, Tally } from "./types";
 import { wilsonLowerBound } from "./wilson";
 
@@ -57,7 +58,7 @@ function wrongBlock(before: Permission, after: Permission, decision: LabelledDec
 /** Re-evaluates the state after a counted label that didn't revoke anything. */
 function transition(permission: Permission, label: Label, policy: Policy): LabelOutcome {
   const current = tally(permission, policy);
-  const clears = current.bound !== null && current.bound >= policy.requiredScore;
+  const clears = qualify(permission.right, permission.wrong, policy) === "clears";
 
   switch (permission.state) {
     case "SHADOW":

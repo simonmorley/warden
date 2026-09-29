@@ -1,6 +1,15 @@
 /** SHADOW recommends only; EARNING is probation; AUTONOMOUS may block on its own (PRD 5). */
 export type PermissionState = "SHADOW" | "EARNING" | "AUTONOMOUS";
 
+/**
+ * A state as reported rather than stored. UNQUALIFIABLE is SHADOW whose record can no longer
+ * plausibly reach the bar; it grants nothing SHADOW doesn't (PRD 6.3).
+ */
+export type Standing = PermissionState | "UNQUALIFIABLE";
+
+/** A track record against the bar: proven, ruled out, or undecided on the evidence so far. */
+export type Qualification = "clears" | "not_yet" | "unqualifiable";
+
 export type Verdict = "phishing" | "not_phishing" | "uncertain";
 
 /** The rules in force. Any change to them is a new policy version, with its own track record. */
