@@ -115,32 +115,7 @@ To make the token, go to **My Profile → API Tokens → Create Token → Create
 
 Limit it to the one account you're using. AI Gateway isn't required, so it needs no permission here.
 
-**Warden's own token** (`WARDEN_TOKEN`) is the bearer token a deployed copy requires for anything that changes state or spends inference. Locally you don't need it, because `WARDEN_OPEN=true` covers that. For a deployment, see below.
-
-## Deploying
-
-Nothing is deployed by default, and that's deliberate. A public copy would spend the owner's inference on whoever found it, and running it against your own account with `npm run dev` is the better way to try something you've just cloned.
-
-If you do want one:
-
-```sh
-openssl rand -hex 32                                  # make a token
-npm run wrangler -w @warden/worker -- secret put WARDEN_TOKEN
-npm run deploy
-```
-
-A deployment has no `.dev.vars`, so it always requires the token. If the token isn't set either, it fails closed rather than open. The dashboard deliberately never holds a credential, so on a deployment it can read but not act; you drive it with the token instead:
-
-```sh
-curl -X POST https://<your-worker>/classify \
-  -H "authorization: Bearer $WARDEN_TOKEN" \
-  -H "content-type: application/json" \
-  -d '{"url":"https://example.com/login"}'
-```
-
-A shared bearer token is fine for a proof of concept and wrong for anything real: it can't say which person applied a label, and you can't revoke one person. The right answer for a real deployment is Cloudflare Access in front of the endpoints that apply labels.
-
-To route model calls through your own AI Gateway, add `AI_GATEWAY_ID` to the Worker's vars. Leave it out and calls go straight to Workers AI. A gateway belongs to one account, so mine would be no use to you, which is why it's optional.
+**Warden's own token** (`WARDEN_TOKEN`) is the bearer token a deployed copy would require for anything that changes state or spends inference. Locally you don't need it, because `WARDEN_OPEN=true` covers that.
 
 ## Cloudflare services
 
@@ -153,7 +128,7 @@ To route model calls through your own AI Gateway, add `AI_GATEWAY_ID` to the Wor
 | **AI Gateway** | Optional. Logs and rate-limits model calls when `AI_GATEWAY_ID` is set. |
 | **Workers Observability** | Logs and traces, on in the config. |
 
-Three that aren't used, and why. **Browser Rendering** is the obvious next step: Warden fetches the HTML as served, so a page assembled by script looks empty to it, and a kit that shows something harmless to datacentre addresses fools it. **Access** is the production answer to the shared token above. **D1 and KV** would be a second source of truth next to the Durable Objects, which is exactly what the Durable Objects are there to prevent.
+Three that aren't used, and why. **Browser Rendering** is the obvious next step: Warden fetches the HTML as served, so a page assembled by script looks empty to it, and a kit that shows something harmless to datacentre addresses fools it. **Access** is what a real deployment would put in front of the endpoints that apply labels, instead of a shared token, so every label has a name on it. **D1 and KV** would be a second source of truth next to the Durable Objects, which is exactly what the Durable Objects are there to prevent.
 
 ## The API
 
@@ -229,7 +204,7 @@ Two findings go beyond the project.
 - **Checking the bar after every result makes a lucky pass likelier than 95% suggests.** A sequential test would fix that, and would still be arithmetic.
 - **A plain fetch sees the HTML as served.** No scripts run, and cloaking works. That's Browser Rendering's job, and it isn't built.
 - **Blocks are simulated.** A blocklist entry and a log line. Nothing leaves the system.
-- **There's no command-line client yet.** On a deployment, that means `curl` and the token.
+- **There's no command-line client yet.**
 
 ## How this was built
 
