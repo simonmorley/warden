@@ -1566,6 +1566,11 @@ routeFromHash();
 loadCorpus();
 loadLive();
 setInterval(loadLive, 15_000);
-// No run in the address: reopen the last one this browser watched, if any.
-const lastRun = stored(RUN_KEY);
-if (!watchingRunId && lastRun) watchDemo(lastRun);
+/** With no run in the address, opens the latest the server knows of, or failing that the last this browser watched. */
+async function openLatestRun() {
+  const res = await api("GET", "/demo/runs/latest");
+  const runId = res.ok ? res.data.runId : stored(RUN_KEY);
+  if (runId && !watchingRunId) watchDemo(runId);
+}
+
+if (!watchingRunId) openLatestRun();
