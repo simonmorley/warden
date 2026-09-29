@@ -225,14 +225,6 @@ Most of the code-quality rules came from reading what it wrote: guard clauses in
 
 `docs/decision-log.md` records every design change since the design docs were written, with what raised it.
 
-## Further reading
-
-- `docs/prd.md` explains what Warden is for, the permission lifecycle, and why the gate is arithmetic.
-- `docs/technical-design.md` covers the components, their boundaries, and the build order.
-- `docs/decision-log.md` records every change since the design, newest first.
-- `packages/fixtures/README.md` covers how the example pages were written, the safety rules, and what the traps found.
-- `CLAUDE.md` holds the rules the build ran under.
-
 ## Licence
 
 MIT, in `LICENSE`. The IBM Plex fonts the dashboard ships are under the SIL Open Font License, alongside them in `apps/dashboard/public/fonts/`.
