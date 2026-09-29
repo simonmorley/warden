@@ -108,7 +108,6 @@ h2 {
 .note {
   margin: 0.4rem 0 1rem;
   color: var(--muted);
-  max-width: 60rem;
 }
 
 .empty {
@@ -434,13 +433,6 @@ footer {
   text-align: center;
 }
 
-/* What this is: the explainer that has to land before any number on the page means anything. */
-.explainer .lede {
-  font-size: 1.05rem;
-  margin: 0 0 1.25rem;
-  max-width: 62rem;
-}
-
 .facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -758,7 +750,6 @@ button.tab.current {
 .hero .answer {
   font-size: 1.05rem;
   margin: 0 0 0.75rem;
-  max-width: 48rem;
 }
 
 /* What is real and what isn't, stated before anything else is. */
@@ -775,7 +766,6 @@ button.tab.current {
 
 .hero .benefit {
   margin: 0 0 1.25rem;
-  max-width: 48rem;
   font-size: 0.95rem;
   color: var(--muted);
 }
@@ -815,23 +805,19 @@ a.cta:hover {
   font-size: 0.9rem;
 }
 
-/* The arithmetic, for whoever wants it, and out of the way of whoever doesn't. */
+/* The arithmetic behind the gates, in plain words. */
 .calc {
-  margin: 0 0 1.5rem;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  margin: 1.25rem 0;
 }
 
-.calc summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.92rem;
+.calc h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
 }
 
 .calc p {
-  margin: 0.5rem 0 0.1rem;
-  max-width: 48rem;
+  margin: 0;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 
