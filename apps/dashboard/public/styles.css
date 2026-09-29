@@ -1828,6 +1828,121 @@ button.event-link:hover {
   text-decoration-color: currentColor;
 }
 
+/* The record replayed: proven precision after each judgement, against the bar. */
+.climb {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.climb-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  width: 10px;
+  height: 1.5px;
+  background: var(--earning);
+}
+
+/* Room above the bars for their labels, outside the box the heights are measured in. */
+.climb-frame {
+  padding-top: 20px;
+}
+
+.climb-chart {
+  position: relative;
+  height: 140px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.climb-chart.dense {
+  gap: 2px;
+}
+
+.climb-bar-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1.5px dashed var(--earning);
+  pointer-events: none;
+}
+
+.climb-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.climb-bar {
+  position: relative;
+  width: 100%;
+  max-width: 56px;
+  min-height: 2px;
+  background: #3a4270;
+  border-radius: 3px 3px 0 0;
+}
+
+.climb-bar.wrong {
+  background: rgba(240, 123, 107, 0.55);
+}
+
+.climb-bar.last {
+  background: var(--accent);
+}
+
+.climb-label {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.change {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.change-when {
+  font-family: var(--mono);
+  color: var(--faint-2);
+}
+
 .feed-head {
   display: flex;
   justify-content: space-between;

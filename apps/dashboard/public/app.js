@@ -305,15 +305,118 @@ function renderLedger(container, state, { onLabel } = {}) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
   const view = views.get(container.id) ?? (state.decisions.length > 20 ? "campaigns" : "all");
+  const climb = climbPanel(state);
+  const events =
+    climb && state.events.length === 0
+      ? null
+      : eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, true);
   container.replaceChildren(
     recordPanel(state),
+    el("div", { class: "section" }, el("h3", {}, "What changed, and why"), climb, events),
+    decisionFeed(state, view, container, onLabel),
+  );
+}
+
+// The chart labels each bar only while there are few enough to read; past that, just the last.
+const LABELLED_BARS = 12;
+
+/**
+ * The record replayed judgement by judgement: the proven precision after each one that
+ * counted in this attempt, against the bar. Recomputed here from the ledger's own labels, in
+ * the order they were given, so its last bar is exactly the figure in the tiles above.
+ */
+function climbPanel(state) {
+  const { permission, policy } = state;
+  const counted = (state.judgements ?? []).filter((judgement) => judgement.counted && judgement.epoch === permission.epoch);
+  if (counted.length === 0) return null;
+
+  let right = 0;
+  let wrong = 0;
+  const points = counted.map((judgement) => {
+    if (judgement.label === "right") right++;
+    if (judgement.label === "wrong") wrong++;
+    return { judgement, right, wrong, bound: wilson(right, right + wrong, policy.z) ?? 0 };
+  });
+
+  const bar = styled(el("div", { class: "climb-bar-line" }), "bottom", `${policy.requiredScore * 100}%`);
+  const columns = points.map((point, index) => climbColumn(point, index, points.length));
+  const chart = el("div", { class: points.length > 40 ? "climb-chart dense" : "climb-chart" }, bar, columns);
+
+  return el(
+    "div",
+    { class: "climb" },
     el(
       "div",
-      { class: "section" },
-      el("h3", {}, "What changed, and why"),
-      eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, true),
+      { class: "climb-head" },
+      el("span", {}, "proven precision after each confirmed judgement"),
+      el("span", { class: "legend" }, el("span", { class: "legend-line", "aria-hidden": "true" }), `${pct(policy.requiredScore)} bar`),
     ),
-    decisionFeed(state, view, container, onLabel),
+    el("div", { class: "climb-frame", role: "img", "aria-label": climbSummary(points, policy) }, chart),
+    changes(state, counted.length),
+  );
+}
+
+/** One judgement's bar, its height the proven precision after it, its time on hover. */
+function climbColumn(point, index, total) {
+  const last = index === total - 1;
+  const classes = ["climb-bar"];
+  if (point.judgement.label === "wrong") classes.push("wrong");
+  if (last) classes.push("last");
+  const at = new Date(point.judgement.labelledAt).toLocaleString();
+  const bar = styled(
+    el("div", {
+      class: classes.join(" "),
+      title: `Judgement ${index + 1} · ${at} · verdict ${point.judgement.label} · ${point.right} of ${point.right + point.wrong} · proven ${pct(point.bound)}`,
+    }),
+    "height",
+    `${point.bound * 100}%`,
+  );
+  if (last || total <= LABELLED_BARS) bar.append(el("span", { class: "climb-label" }, pct(point.bound)));
+  return el("div", { class: "climb-col" }, bar);
+}
+
+/** The chart in a sentence, for anyone who can't see it. */
+function climbSummary(points, policy) {
+  const first = points[0];
+  const last = points[points.length - 1];
+  return `Proven precision over ${plural(points.length, "judgement")}, from ${pct(first.bound)} to ${pct(last.bound)}, against a bar of ${pct(policy.requiredScore)}.`;
+}
+
+/** Where each state leaves Warden, as the end of a sentence. */
+const STAYS = {
+  SHADOW: "Warden stays at Recommends only",
+  EARNING: "Warden is on trial",
+  AUTONOMOUS: "Warden may act alone",
+  UNQUALIFIABLE: "on this evidence Warden can't qualify",
+};
+
+/** The record in three lines under the chart: where it stands, what didn't count, and where this attempt began. */
+function changes(state, countedInAttempt) {
+  const { permission, policy } = state;
+  const n = permission.right + permission.wrong;
+  const bound = wilson(permission.right, n, policy.z);
+  const clears = bound !== null && bound >= policy.requiredScore;
+  const uncounted = (state.judgements ?? []).filter((judgement) => !judgement.counted).length;
+  const rows = [
+    [
+      "now",
+      `Confirmed ${permission.right} of ${plural(n, "phishing verdict")} correct. Proven precision ${pct(bound)}, ` +
+        `${clears ? "at or above" : "still under"} ${pct(policy.requiredScore)}, so ${STAYS[standingOf(state)]}.`,
+    ],
+    uncounted > 0
+      ? ["other", `Confirmed ${plural(uncounted, "verdict")} that could not count: only a phishing verdict moves the record.`]
+      : null,
+    [
+      "start",
+      permission.epoch === 1
+        ? "First attempt. No permission."
+        : `Attempt ${permission.epoch}. Permission was revoked ${permission.epoch - 1}×, so the record began again from zero; ${plural(countedInAttempt, "judgement")} have counted since.`,
+    ],
+  ];
+  return el(
+    "div",
+    { class: "changes" },
+    rows.filter(Boolean).map(([when, text]) => el("div", { class: "change" }, el("span", { class: "change-when" }, when), el("span", {}, text))),
   );
 }
 
