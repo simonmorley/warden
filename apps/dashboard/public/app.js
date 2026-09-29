@@ -1,7 +1,9 @@
 // Warden's dashboard.
 //
 // Much of what it shows was written by whoever controls a reported page, so it is only ever
-// inserted as text, never as markup, and no link is ever built from a page's URL.
+// inserted as text, never as markup, and no link is ever built from a page's URL. Styling is
+// all in the stylesheet: the page's policy refuses inline style attributes, so the few sizes
+// that depend on data are set through the CSSOM instead.
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,6 +33,12 @@ function setProp(node, key, value) {
 function appendChild(node, child) {
   if (child === null || child === undefined || child === false) return;
   node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+}
+
+/** Sets one CSS property through the CSSOM, which the page's policy allows where an inline style attribute isn't. */
+function styled(node, property, value) {
+  node.style.setProperty(property, value);
+  return node;
 }
 
 // Which run this tab is watching. No credential is ever held here: a local run needs none,
@@ -148,6 +156,11 @@ function pct(value) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+/** "1 page", "2 pages". */
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
 /** What each permission state means, without the vocabulary. */
 const STATES = {
   SHADOW: { label: "Recommends only", detail: "Everything goes to a person. Nothing is blocked automatically." },
@@ -160,16 +173,19 @@ const STATES = {
   },
 };
 
-/** Why a decision went to a person instead of being acted on: short badge, sentence on hover. */
+/**
+ * Why a decision went to a person instead of being acted on: short badge, sentence on hover,
+ * and a tone for its dot — held back by the rules, refused outright, or simply not asked.
+ */
 const REASONS = {
-  shadow: ["recommends only", "Warden could only recommend: it had not earned permission to act."],
-  earning: ["on trial", "Warden was on trial: the evidence held, but it had not finished proving itself."],
-  cap_full: ["cap full", "Three automatic blocks were already awaiting review, so everything else waits for a person."],
-  stale_epoch: ["permission changed", "Permission was revoked while this page was being classified, so the verdict could not act."],
-  rejected: ["answer rejected", "The model's answer failed validation, so it earned nothing and went to a person."],
-  not_phishing: ["said legitimate", "The model said this page is not phishing, so there was nothing to act on."],
-  uncertain: ["said unsure", "The model would not commit either way, so a person decides."],
-  duplicate: ["already seen", "This page had already been decided here, so it counts once."],
+  shadow: ["recommends only", "Warden could only recommend: it had not earned permission to act.", ""],
+  earning: ["on trial", "Warden was on trial: the evidence held, but it had not finished proving itself.", "held"],
+  cap_full: ["cap full", "Three automatic blocks were already awaiting review, so everything else waits for a person.", "held"],
+  stale_epoch: ["permission changed", "Permission was revoked while this page was being classified, so the verdict could not act.", "refused"],
+  rejected: ["answer rejected", "The model's answer failed validation, so it earned nothing and went to a person.", "refused"],
+  not_phishing: ["said legitimate", "The model said this page is not phishing, so there was nothing to act on.", ""],
+  uncertain: ["said unsure", "The model would not commit either way, so a person decides.", ""],
+  duplicate: ["already seen", "This page had already been decided here, so it counts once.", ""],
 };
 
 /**
@@ -180,19 +196,26 @@ function checkBadge(route) {
   if (route.to === "block") {
     return el("span", { class: "badge blocked", title: "Warden blocked this URL on its own, with no person involved." }, "blocked automatically");
   }
-  const [short, full] = REASONS[route.reason] ?? [route.reason, route.reason];
-  return el("span", { class: "badge", title: full }, `sent to a person — ${short}`);
+  const [short, full, tone] = REASONS[route.reason] ?? [route.reason, route.reason, ""];
+  return el("span", { class: `badge ${tone}`, title: full }, `sent to a person — ${short}`);
 }
 
-/** One summary tile. */
-function tile(label, value, sub, extra) {
+/** A bar filled to `fraction`, with an optional marker at `mark` (both 0–1). */
+function meter(fraction, mark) {
+  const fill = styled(el("div", { class: "meter-fill" }), "width", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
+  const marker = mark === undefined ? null : styled(el("div", { class: "meter-mark" }), "left", `${mark * 100}%`);
+  return el("div", { class: "meter", "aria-hidden": "true" }, fill, marker);
+}
+
+/** One summary tile: label, value, an optional picture of it, and a line of explanation. */
+function tile(label, value, sub, picture, { dim = false } = {}) {
   return el(
     "div",
     { class: "tile" },
     el("div", { class: "label" }, label),
-    el("div", { class: "value" }, value),
+    el("div", { class: dim ? "value dim" : "value" }, value),
+    picture ?? null,
     sub ? el("div", { class: "sub" }, sub) : null,
-    extra ?? null,
   );
 }
 
@@ -208,6 +231,15 @@ const MEANING = {
   probation_restarted: "The ten clean calls it needs must now start over.",
   revoked: "Everything it had earned is gone. It must build the whole record again from nothing.",
   reversed: "That URL is no longer blocked. A person's judgement undid what the AI did.",
+};
+
+/** A short name for each kind of change, for the history's left-hand column. */
+const KINDS = {
+  promoted: "promoted",
+  demoted: "demoted",
+  probation_restarted: "trial reset",
+  revoked: "revoked",
+  reversed: "reversed",
 };
 
 /** The state change an event caused, shown as it moved: from one mode to the other. */
@@ -261,21 +293,42 @@ function runText(run) {
   return `Stopped after ${run.next} of ${run.total} pages: ${run.reason}`;
 }
 
-// Which slice of the decision feed to show. "What mattered" is the default because the set
-// is mostly campaign siblings: near-identical pages that nearly all go the same way.
+// Which slice of the decision feed to show, per record.
 const views = new Map();
 
-/** Renders the live record: summary tiles, events and the decision feed. Read-only —
- * judgements are given under Review, in one place rather than two. */
+/** Renders the live record: where it stands, what changed, and the decisions. */
 function renderLedger(container, state, { onLabel } = {}) {
+  if (state.decisions.length === 0) {
+    container.replaceChildren(recordPanel(state), placeholders());
+    return;
+  }
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
   // A short record shows everything; only a long one needs filtering down to the story.
   const view = views.get(container.id) ?? (state.decisions.length > 20 ? "campaigns" : "all");
   container.replaceChildren(
-    ...recordPanel(state),
-    el("h3", {}, "What changed, and why"),
-    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, state.decisions.length > 0),
-    ...decisionFeed(state, view, container, onLabel),
+    recordPanel(state),
+    el(
+      "div",
+      { class: "section" },
+      el("h3", {}, "What changed, and why"),
+      eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, true),
+    ),
+    decisionFeed(state, view, container, onLabel),
+  );
+}
+
+/** What an empty record has yet to show, as outlines of the sections that will fill in. */
+function placeholders() {
+  return el(
+    "div",
+    { class: "placeholders" },
+    el(
+      "div",
+      { class: "placeholder" },
+      el("h3", {}, "What changed, and why"),
+      el("p", { class: "empty" }, "Nothing yet. This fills in as Warden gains or loses permission."),
+    ),
+    el("div", { class: "placeholder" }, el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")),
   );
 }
 
@@ -291,23 +344,40 @@ function renderEvaluation(container, state) {
   container.replaceChildren(
     runStatus(state.run, state),
     resultPanel(state),
-    ...decisionFeed(state, view, container),
-    el("h3", { class: "arc-title" }, "What this precision would do on live traffic"),
+    decisionFeed(state, view, container),
     el(
-      "p",
-      { class: "sandbox" },
-      el("b", {}, "A rehearsal, not a grant. "),
-      "The same pages, replayed through Warden's permission rules on a throwaway ledger as if each were a real report " +
-        "and each known answer an analyst's judgement. It shows how permission would be earned, used and lost at this " +
-        "precision. Nothing here carries over: the live system starts from zero whatever this shows.",
+      "div",
+      { class: "arc" },
+      el("h3", {}, "What this precision would do on live traffic"),
+      el(
+        "p",
+        { class: "sandbox" },
+        el("strong", {}, "A rehearsal, not a grant. "),
+        "The same pages, replayed through Warden's permission rules on a throwaway ledger as if each were a real report " +
+          "and each known answer an analyst's judgement. It shows how permission would be earned, used and lost at this " +
+          "precision. Nothing here carries over: the live system starts from zero whatever this shows.",
+      ),
+      ladder(state),
+      story(state, state.run),
+      ...rebuildingNote(state),
+      ...(state.permission.right + state.permission.wrong > 0 ? [summaryTiles(state)] : []),
+      el("h4", {}, "What changed, and why"),
+      // Known answers do the confirming here, so the prompt to confirm a verdict doesn't apply.
+      eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false),
     ),
-    ladder(state),
-    story(state, state.run),
-    ...rebuildingNote(state),
-    ...(state.permission.right + state.permission.wrong > 0 ? [summaryTiles(state)] : []),
-    el("h4", {}, "What changed, and why"),
-    // Known answers do the confirming here, so the prompt to confirm a verdict doesn't apply.
-    eventList(state.events, (id) => urls.get(id) ?? "an unknown URL", container, false),
+  );
+}
+
+/** Before any run: a quiet placeholder where the result will appear. */
+function emptyScore() {
+  const bars = Array.from({ length: 22 }, (_, i) =>
+    styled(el("span"), "height", `${6 + Math.round(Math.abs(Math.sin(i * 1.7)) * 20)}px`),
+  );
+  return el(
+    "div",
+    { class: "empty-state" },
+    el("div", { class: "empty-bars", "aria-hidden": "true" }, bars),
+    el("p", {}, "Nothing scored yet."),
   );
 }
 
@@ -316,8 +386,8 @@ function runStatus(run, state) {
   return el(
     "div",
     { class: "run" },
-    el("span", { class: `status ${run.status}` }, runText(run)),
-    el("progress", { value: run.next, max: run.total }),
+    el("span", { class: `run-status ${run.status}` }, runText(run)),
+    meter(run.total === 0 ? 0 : run.next / run.total),
     el("div", { class: "cost" }, costOf(state.decisions.length)),
   );
 }
@@ -365,7 +435,6 @@ function resultPanel({ evaluation, policy, run, scope }) {
   const { qualification, phishingCalls: calls, allCalls: all } = evaluation;
   const verdict = QUALIFICATIONS[qualification];
   const n = calls.right + calls.wrong;
-  const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
   return el(
     "div",
@@ -374,7 +443,7 @@ function resultPanel({ evaluation, policy, run, scope }) {
       "div",
       { class: "result-head" },
       el("span", { class: `qualification ${qualification}` }, verdict.title),
-      run.status === "running" ? el("span", { class: "muted" }, "so far — provisional until every page is scored") : null,
+      run.status === "running" ? el("span", { class: "provisional" }, "so far — provisional until every page is scored") : null,
     ),
     el(
       "div",
@@ -386,6 +455,7 @@ function resultPanel({ evaluation, policy, run, scope }) {
         n === 0 ? "measured precision" : `measured precision — ${calls.right} of ${plural(n, "phishing call")} right`,
       ),
     ),
+    n === 0 ? null : interval(calls, policy),
     n === 0
       ? null
       : el(
@@ -404,9 +474,28 @@ function resultPanel({ evaluation, policy, run, scope }) {
     ),
     el(
       "p",
-      { class: "muted scope" },
+      { class: "scope" },
       `Configuration scored: ${scope.modelId} · prompt ${scope.promptHash.slice(0, 12)} · policy ${scope.policyHash.slice(0, 12)}`,
     ),
+  );
+}
+
+/**
+ * The plausible range drawn against the bar: a band from the lower to the upper bound, the
+ * measured value within it, and the bar as a marker. The scale starts low enough to show the
+ * whole band, so a wide one isn't cropped into looking narrow.
+ */
+function interval(calls, policy) {
+  const floor = Math.min(0.8, Math.floor(calls.lower * 10) / 10);
+  const at = (value) => `${((value - floor) / (1 - floor)) * 100}%`;
+  const band = styled(styled(el("div", { class: "meter-fill" }), "left", at(calls.lower)), "right", `calc(100% - ${at(calls.upper)})`);
+  const point = styled(el("div", { class: "interval-point" }), "left", at(calls.measured));
+  const bar = styled(el("div", { class: "meter-mark" }), "left", at(policy.requiredScore));
+  return el(
+    "div",
+    { class: "interval", "aria-hidden": "true" },
+    el("div", { class: "meter" }, band, bar, point),
+    el("div", { class: "interval-scale" }, el("span", {}, pct(floor)), el("span", {}, `bar ${pct(policy.requiredScore)}`), el("span", {}, "100%")),
   );
 }
 
@@ -418,10 +507,12 @@ function resultPanel({ evaluation, policy, run, scope }) {
 function recordPanel(state) {
   const { permission, policy } = state;
   if (permission.right + permission.wrong > 0) {
-    return [
+    return el(
+      "div",
+      { class: "record" },
       summaryTiles(state),
-      el("p", { class: "hint" }, "Proven precision is recomputed in your browser from the counts above, using the server's own policy."),
-    ];
+      el("p", { class: "record-note" }, "Proven precision is recomputed in your browser from the counts above, using the server's own policy."),
+    );
   }
 
   const classified = state.decisions.length;
@@ -429,11 +520,14 @@ function recordPanel(state) {
   const uncountable = state.decisions.filter((decision) => decision.label !== null && !decision.counted).length;
   const needed = correctCallsStillNeeded(0, 0, policy);
 
-  return [
+  return el(
+    "div",
+    { class: "standing" },
+    el("span", { class: "standing-icon", "aria-hidden": "true" }),
     el(
       "div",
-      { class: "standing" },
-      el("p", {}, el("b", {}, "Warden has earned nothing here yet, so everything goes to you.")),
+      { class: "standing-text" },
+      el("p", {}, "Warden has earned nothing here yet, so everything goes to you."),
       el(
         "p",
         {},
@@ -447,7 +541,7 @@ function recordPanel(state) {
             "p",
             {},
             `${uncountable} confirmed judgement${uncountable === 1 ? "" : "s"} did not move the record. Only a verdict of `,
-            el("b", {}, "phishing"),
+            el("strong", {}, "phishing"),
             " counts towards it: being right that a page is harmless is easy, and counting it would flatter the numbers.",
           )
         : null,
@@ -457,15 +551,15 @@ function recordPanel(state) {
         `Starting from nothing, ${needed} confirmed-correct phishing verdicts clear the bar, and ${policy.probationLength} more in a row after that before Warden may act alone. That is the point of the bar.`,
       ),
     ),
-  ];
+  );
 }
 
-/** Where the run stands on the same ladder the front page explains, lit as it climbs. */
+/** Where the run stands on the same lifecycle the front page explains, lit as it climbs. */
 function ladder(state) {
-  const rungs = [
-    ["SHADOW", "Recommends only", "every verdict goes to a person"],
-    ["EARNING", "On trial", "strong enough, not yet proved"],
-    ["AUTONOMOUS", "Acts alone", "blocks URLs by itself"],
+  const stages = [
+    ["SHADOW", "shadow", "Recommends only", "Every verdict goes to a person."],
+    ["EARNING", "earning", "On trial", "Strong enough, not yet proved."],
+    ["AUTONOMOUS", "autonomous", "Acts alone", "Blocks URLs by itself."],
   ];
   const reached = new Set(["SHADOW"]);
   for (const recorded of state.events) {
@@ -474,24 +568,32 @@ function ladder(state) {
 
   return el(
     "ol",
-    { class: "ladder live" },
-    rungs.flatMap(([key, name, note], index) => {
-      const classes = ["rung", key.toLowerCase()];
+    { class: "lifecycle live", "aria-label": "Where the rehearsal stands" },
+    stages.flatMap(([key, css, name, note], index) => {
+      const classes = ["stage", css];
       if (reached.has(key)) classes.push("been");
       if (state.permission.state === key) classes.push("here");
-      const rung = el(
+      const stage = el(
         "li",
         { class: classes.join(" ") },
-        el("span", { class: "rung-name" }, name),
-        el("span", { class: "rung-note" }, state.permission.state === key ? hereNote(state) : note),
+        el("div", { class: "stage-name" }, el("span", { class: "stage-dot", "aria-hidden": "true" }), name),
+        el("div", { class: "stage-note" }, state.permission.state === key ? hereNote(state) : note),
       );
-      if (index === rungs.length - 1) return [rung];
-      return [rung, el("li", { class: "gate", "aria-hidden": "true" }, el("span", {}, index === 0 ? "73 reviewed, none wrong" : "10 more in a row"))];
+      if (index === stages.length - 1) return [stage];
+      return [
+        stage,
+        el(
+          "li",
+          { class: "step-arrow" },
+          el("span", { class: "step-label" }, index === 0 ? "73 reviewed, none wrong" : "10 more in a row"),
+          el("span", { class: "step-line", "aria-hidden": "true" }),
+        ),
+      ];
     }),
   );
 }
 
-/** The marker on the rung it stands on, saying so when that rung is as high as the evidence allows. */
+/** The marker on the stage it stands on, saying so when that stage is as high as the evidence allows. */
 function hereNote(state) {
   if (standingOf(state) !== "UNQUALIFIABLE") return "← it is here now";
   return "← it is here, and on this evidence the bar is out of reach";
@@ -547,6 +649,7 @@ function summaryTiles(record) {
   const state = STATES[shown];
   const attempt =
     permission.epoch > 1 ? `attempt ${permission.epoch} — permission has been revoked ${permission.epoch - 1}×` : "first attempt";
+  const onTrial = permission.state === "EARNING";
 
   return el(
     "div",
@@ -556,33 +659,54 @@ function summaryTiles(record) {
       "Precision we can prove",
       pct(bound),
       `needs ${pct(policy.requiredScore)} — the worst its true precision could plausibly be, not its average`,
-      el("progress", { value: bound ?? 0, max: 1 }),
+      meter(bound ?? 0, policy.requiredScore),
     ),
     tile("Confirmed correct", `${permission.right} of ${n}`, `${permission.wrong} wrong since the last reset`),
-    stillNeededTile(shown, stillNeeded),
+    stillNeededTile(shown, permission.right, stillNeeded),
     tile(
       "Trial progress",
-      permission.state === "EARNING" ? `${permission.probation} of ${policy.probationLength}` : "—",
+      onTrial ? `${permission.probation} of ${policy.probationLength}` : "—",
       "correct in a row before it may act alone",
+      onTrial ? slots(permission.probation, policy.probationLength) : null,
+      { dim: !onTrial },
     ),
     tile(
       "Blocks awaiting review",
       `${permission.unreviewed} of ${policy.maxUnreviewed}`,
-      `${blocklist.length} URL${blocklist.length === 1 ? "" : "s"} blocked right now`,
+      `${plural(blocklist.length, "URL")} blocked right now`,
+      slots(permission.unreviewed, policy.maxUnreviewed),
     ),
   );
 }
 
+/** `total` small boxes, the first `filled` of them lit. */
+function slots(filled, total) {
+  return el(
+    "div",
+    { class: "slots", "aria-hidden": "true" },
+    Array.from({ length: total }, (_, i) => el("span", { class: i < filled ? "on" : "" })),
+  );
+}
+
 /**
- * How far the bar is. For a record that can't qualify, a count would be true only of an
+ * How far the bar is, with a tick for every correct call it takes: the ones made so far lit,
+ * the ones still needed not. For a record that can't qualify, a count would be true only of an
  * unbroken run of correct calls from here — so it says the bar is out of reach instead.
  */
-function stillNeededTile(shown, stillNeeded) {
+function stillNeededTile(shown, right, stillNeeded) {
   if (shown === "UNQUALIFIABLE") {
     return tile("Still needed", "out of reach", "the best its precision could plausibly be is under the bar");
   }
-  const value = shown === "SHADOW" && stillNeeded !== null ? `${stillNeeded} more` : "none";
-  return tile("Still needed", value, "correct calls before it could be trusted to act");
+  if (shown !== "SHADOW" || stillNeeded === null) {
+    return tile("Still needed", "none", "correct calls before it could be trusted to act", null, { dim: true });
+  }
+  const total = Math.min(right + stillNeeded, 200);
+  const ticks = el(
+    "div",
+    { class: "ticks", "aria-hidden": "true" },
+    Array.from({ length: total }, (_, i) => el("span", { class: i < right ? "on" : "" })),
+  );
+  return tile("Still needed", `${stillNeeded} more`, "correct calls before it could be trusted to act", ticks);
 }
 
 /** Promotions, revocations and reversals, each linking to the decision that caused it. */
@@ -592,7 +716,7 @@ function eventList(events, urlOf, container, hasDecisions) {
       "p",
       { class: "empty" },
       hasDecisions
-        ? "Warden's permission hasn't moved yet. Only a confirmed judgement changes it, so confirm a verdict above and this fills in."
+        ? "Warden's permission hasn't moved yet. Only a confirmed judgement changes it, so confirm a verdict below and this fills in."
         : "Nothing yet. This fills in as Warden gains or loses permission.",
     );
   }
@@ -604,19 +728,24 @@ function eventList(events, urlOf, container, hasDecisions) {
       return el(
         "li",
         { class: recorded.event.kind },
-        transition(recorded.event),
+        el("span", { class: "event-kind" }, KINDS[recorded.event.kind] ?? recorded.event.kind),
         el(
-          "button",
-          {
-            type: "button",
-            class: "event-link",
-            title: "Show the decision that caused this",
-            onclick: () => revealDecision(container, recorded.decisionId),
-          },
-          headline,
+          "div",
+          { class: "event-body" },
+          transition(recorded.event),
+          el(
+            "button",
+            {
+              type: "button",
+              class: "event-link",
+              title: "Show the decision that caused this",
+              onclick: () => revealDecision(container, recorded.decisionId),
+            },
+            headline,
+          ),
+          el("span", { class: "meaning" }, MEANING[recorded.event.kind] ?? ""),
+          el("span", { class: "receipt" }, receipt),
         ),
-        el("span", { class: "meaning" }, MEANING[recorded.event.kind] ?? ""),
-        el("span", { class: "receipt" }, receipt),
       );
     }),
   );
@@ -649,7 +778,9 @@ function mattered(decision) {
 /** The decision feed: heading, view switch, caption and table. */
 function decisionFeed(state, view, container, onLabel) {
   const { decisions } = state;
-  if (decisions.length === 0) return [el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet.")];
+  if (decisions.length === 0) {
+    return el("div", { class: "section" }, el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet."));
+  }
 
   const showing =
     view === "campaigns"
@@ -657,34 +788,31 @@ function decisionFeed(state, view, container, onLabel) {
       : (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
   const label =
     view === "campaigns"
-      ? `Decisions — ${showing} campaign${showing === 1 ? "" : "s"}, ${decisions.length} page${decisions.length === 1 ? "" : "s"}`
+      ? `Decisions — ${plural(showing, "campaign")}, ${plural(decisions.length, "page")}`
       : `Decisions — showing ${showing} of ${decisions.length}`;
   const heading = el(
     "div",
-    { class: "section-head" },
+    { class: "feed-head" },
     el("h3", {}, label),
     el(
       "div",
-      { class: "views" },
+      { class: "views", role: "group", "aria-label": "How much to show" },
       viewButton("campaigns", "By campaign", view, container),
       viewButton("mattered", "What mattered", view, container),
       viewButton("all", "Everything", view, container),
     ),
   );
   const caption = el("p", { class: "note" }, captionFor(view, state));
+  return el("div", { class: "section" }, heading, caption, feedBody(decisions, view, container, onLabel));
+}
 
-  if (view === "campaigns") return [heading, caption, campaignTable(decisions)];
-
-  if (view === "mattered") {
-    const notable = decisions.filter(mattered);
-    if (notable.length === 0) {
-      return [heading, caption, el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.")];
-    }
-    return [heading, caption, matteredTable(notable, container)];
-  }
-
-  const shown = decisions.slice(-120);
-  return [heading, caption, decisionTable(shown.slice().reverse(), onLabel)];
+/** The table for the chosen view. */
+function feedBody(decisions, view, container, onLabel) {
+  if (view === "campaigns") return campaignTable(decisions);
+  if (view === "all") return decisionTable(decisions.slice(-120).reverse(), onLabel);
+  const notable = decisions.filter(mattered);
+  if (notable.length === 0) return el("p", { class: "empty" }, "Nothing unexpected happened — every call went as intended.");
+  return matteredTable(notable, container);
 }
 
 /** Explains what the current view shows, and where these pages came from. */
@@ -707,6 +835,7 @@ function viewButton(id, label, current, container) {
     {
       type: "button",
       class: id === current ? "view current" : "view",
+      "aria-pressed": id === current ? "true" : "false",
       onclick: () => {
         views.set(container.id, id);
         container.dispatchEvent(new CustomEvent("rerender"));
@@ -714,6 +843,12 @@ function viewButton(id, label, current, container) {
     },
     label,
   );
+}
+
+/** A table in the feed's frame, scrolling sideways on its own when the screen is narrow. */
+function feedTable(headings, rows) {
+  const head = el("thead", {}, el("tr", {}, headings.map((t) => el("th", {}, t))));
+  return el("div", { class: "feed" }, el("table", {}, head, el("tbody", {}, rows)));
 }
 
 /**
@@ -738,41 +873,31 @@ function matteredTable(notable, container) {
     groups.set(key, group);
   }
 
-  const head = el("thead", {}, el("tr", {}, ["Page", "Outcome", "Times"].map((t) => el("th", {}, t))));
-  const body = el(
-    "tbody",
-    {},
-    [...groups.values()]
-      .sort((a, b) => b.count - a.count)
-      .map((group) =>
+  const rows = [...groups.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((group) =>
+      el(
+        "tr",
+        {},
+        el("td", {}, el("div", { class: "technique" }, group.technique), truthMark(group.truth)),
+        el("td", {}, checkBadge(group.route), el("div", { class: "claims" }, group.outcome)),
         el(
-          "tr",
-          {},
+          "td",
+          { class: "num" },
           el(
-            "td",
-            {},
-            el("div", { class: "technique" }, group.technique),
-            truthMark(group.truth),
-          ),
-          el("td", {}, checkBadge(group.route), " ", el("span", { class: "muted" }, group.outcome)),
-          el(
-            "td",
-            {},
-            el(
-              "button",
-              {
-                type: "button",
-                class: "event-link",
-                title: "Show one of these in the full list",
-                onclick: () => revealDecision(container, group.first.id),
-              },
-              `${group.count}×`,
-            ),
+            "button",
+            {
+              type: "button",
+              class: "event-link",
+              title: "Show one of these in the full list",
+              onclick: () => revealDecision(container, group.first.id),
+            },
+            `${group.count}×`,
           ),
         ),
       ),
-  );
-  return el("div", { class: "feed" }, el("table", {}, head, body));
+    );
+  return feedTable(["Page", "Outcome", "Times"], rows);
 }
 
 /** How a decision ended, in the words a reviewer would use to describe it. */
@@ -808,41 +933,29 @@ function campaignTable(decisions) {
     families.set(key, family);
   }
 
-  const head = el(
-    "thead",
-    {},
-    el("tr", {}, ["Campaign", "Technique", "Pages", "Correct", "Wrong", "Blocked", "Unusable"].map((t) => el("th", {}, t))),
-  );
-  const body = el(
-    "tbody",
-    {},
-    [...families.values()].map((family) =>
-      el(
-        "tr",
-        {},
-        el("td", {}, family.key),
-        // What the pages really are, so a wrong call reads as a miss or a false alarm at a glance.
-        el("td", {}, el("div", { class: "muted" }, family.technique), truthMark(family.truth)),
-        el("td", {}, String(family.pages)),
-        el("td", { class: "label-right" }, String(family.right)),
-        el("td", { class: family.wrong > 0 ? "label-wrong" : "muted" }, String(family.wrong)),
-        el("td", {}, String(family.blocked)),
-        el("td", { class: "muted" }, String(family.unusable)),
-      ),
+  const rows = [...families.values()].map((family) =>
+    el(
+      "tr",
+      {},
+      el("td", { class: "url" }, family.key),
+      // What the pages really are, so a wrong call reads as a miss or a false alarm at a glance.
+      el("td", {}, el("div", { class: "technique" }, family.technique), truthMark(family.truth)),
+      el("td", { class: "num" }, String(family.pages)),
+      el("td", { class: "num label-right" }, String(family.right)),
+      el("td", { class: family.wrong > 0 ? "num label-wrong" : "num muted" }, String(family.wrong)),
+      el("td", { class: "num" }, String(family.blocked)),
+      el("td", { class: "num muted" }, String(family.unusable)),
     ),
   );
-  return el("div", { class: "feed" }, el("table", {}, head, body));
+  return feedTable(["Campaign", "Technique", "Pages", "Correct", "Wrong", "Blocked", "Unusable"], rows);
 }
 
 /** The decision table, newest first. */
 function decisionTable(shown, onLabel) {
-  const head = el(
-    "thead",
-    {},
-    el("tr", {}, ["Page", "Verdict", "Evidence cited", "Outcome", "Block", "Confirmed"].map((t) => el("th", {}, t))),
+  return feedTable(
+    ["Page", "Verdict", "Evidence cited", "Outcome", "Block", "Confirmed"],
+    shown.map((decision) => feedRow(decision, onLabel)),
   );
-  const body = el("tbody", {}, shown.map((decision) => feedRow(decision, onLabel)));
-  return el("div", { class: "feed" }, el("table", {}, head, body));
 }
 
 /** One decision: what the page is, what the model said, and what it was allowed to do. */
@@ -879,8 +992,8 @@ function verdictCell(decision) {
   const verdict = el("span", { class: `verdict-${decision.verdict}` }, decision.verdict.replace("_", " "));
   if (decision.confidence === null) return verdict;
   const stated = el(
-    "div",
-    { class: "muted", title: "The model's own stated confidence. Recorded, but it decides nothing." },
+    "span",
+    { class: "claims", title: "The model's own stated confidence. Recorded, but it decides nothing." },
     `it claims ${Math.round(decision.confidence * 100)}%`,
   );
   return [verdict, stated];
@@ -903,7 +1016,7 @@ function blockCell(decision) {
   return el("span", { class: `block-${decision.block}`, title }, decision.block === "reversed" ? "undone" : "in place");
 }
 
-/** The confirmed answer, or a note saying where to give one. */
+/** The confirmed answer, or the buttons to give one. */
 function labelCell(decision, onLabel) {
   if (decision.label) {
     const title =
@@ -915,10 +1028,10 @@ function labelCell(decision, onLabel) {
   if (!onLabel) return el("span", { class: "muted" }, "not yet judged");
   return el(
     "div",
-    { class: "actions" },
+    { class: "judge" },
     el("button", { type: "button", class: "secondary", onclick: () => onLabel(decision.id, "right") }, "Correct"),
     el("button", { type: "button", class: "secondary", onclick: () => onLabel(decision.id, "wrong") }, "Wrong"),
-    decision.counted ? null : el("div", { class: "muted", title: "Only a verdict of phishing counts towards the record." }, "won't move the record"),
+    decision.counted ? null : el("span", { class: "muted", title: "Only a verdict of phishing counts towards the record." }, "won't move the record"),
   );
 }
 
@@ -977,6 +1090,17 @@ $("run-demo").addEventListener("click", async () => {
   watchDemo(res.data.runId);
 });
 
+// Each scoring run already gets its own ledger, so running again is the reset. Clearing only
+// stops showing the old one, and costs nothing.
+$("clear-demo").addEventListener("click", () => {
+  store(RUN_KEY, "");
+  lastDemoState = null;
+  clearTimeout(demoTimer);
+  $("demo").replaceChildren(emptyScore());
+  $("clear-demo").hidden = true;
+  $("run-demo").textContent = "Score it";
+});
+
 // The live ledger.
 let lastLiveState = null;
 
@@ -998,7 +1122,6 @@ async function loadLive() {
   renderLedger($("live"), res.data, { onLabel: labelLive });
 }
 
-
 /**
  * What the live system is allowed to do, in the masthead, colour-coded and on every page.
  * It is the one fact a viewer should never have to go looking for.
@@ -1007,9 +1130,8 @@ function showLiveStatus(record) {
   const { permission } = record;
   const shown = standingOf(record);
   const state = STATES[shown];
-  const mode = $("live-status-mode");
-  mode.textContent = state.label;
-  mode.className = `live-status-mode ${shown}`;
+  $("live-status-mode").textContent = state.label;
+  $("live-status-dot").className = `live-dot ${shown}`;
   $("live-status").title = `${state.detail}${permission.epoch > 1 ? ` Permission has been revoked ${permission.epoch - 1}×.` : ""}`;
 }
 
@@ -1031,17 +1153,6 @@ async function labelLive(decisionId, label) {
   );
   await loadLive();
 }
-
-// Each scoring run already gets its own ledger, so running again is the reset. Clearing only
-// stops showing the old one, and costs nothing.
-$("clear-demo").addEventListener("click", () => {
-  store(RUN_KEY, "");
-  lastDemoState = null;
-  clearTimeout(demoTimer);
-  $("demo").replaceChildren(el("p", { class: "empty" }, "Nothing scored yet."));
-  $("clear-demo").hidden = true;
-  $("run-demo").textContent = "Score it";
-});
 
 $("reset-live").addEventListener("click", async () => {
   const waiting = lastLiveState?.decisions.length ?? 0;
@@ -1082,77 +1193,92 @@ $("try-html").addEventListener("input", () => {
   }
 });
 
-/** A definition-list row. */
-function row(term, ...definition) {
-  return [el("dt", {}, term), el("dd", {}, ...definition)];
+/** One numbered step of what happened to a page, with a tone for its number. */
+function pipelineStep(index, tone, title, ...body) {
+  return el(
+    "li",
+    {},
+    el("div", { class: "step-rail" }, el("span", { class: `step-index ${tone}` }, String(index))),
+    el("div", { class: "step-content" }, el("div", { class: "step-title" }, title), ...body),
+  );
 }
 
+/** How the verdict's number is coloured: a phishing call in red, a clean one green, an unsure one amber. */
+const VERDICT_TONES = { phishing: "bad", not_phishing: "good", uncertain: "warn" };
+
 /** What happened to a page, step by step, so the flow is visible rather than implied. */
-function renderClassification(d) {
+function renderClassification(d, url) {
   const excerpt = d.excerpt.length > 300 ? `${d.excerpt.slice(0, 300)}…` : d.excerpt;
   const stated = d.confidence === null ? "" : ` — it claims ${Math.round(d.confidence * 100)}% confidence, which decides nothing`;
-  const step = (n, title, ...body) =>
-    el("li", {}, el("div", { class: "step-title" }, `${n}. ${title}`), el("div", { class: "step-body" }, ...body));
+  const verdict = d.verdict ?? "none";
 
   return el(
     "div",
-    { class: "result" },
+    { class: "result-card" },
+    el("div", { class: "result-bar" }, el("span", { class: "url", title: url }, url), el("span", { class: `verdict-${verdict}` }, verdict.replace("_", " "))),
     el(
       "ol",
       { class: "pipeline" },
       d.fetched
-        ? step("0", "Warden fetched the page", el("span", { class: "muted" }, "https only, redirects re-checked at every hop, nothing aimed at a private address"))
-        : step("0", "You supplied the page source", el("span", { class: "muted" }, "nothing was fetched")),
-      step(
-        "1",
+        ? pipelineStep(0, "", "Warden fetched the page", el("div", { class: "step-body" }, "https only, redirects re-checked at every hop, nothing aimed at a private address"))
+        : pipelineStep(0, "", "You supplied the page source", el("div", { class: "step-body" }, "nothing was fetched")),
+      pipelineStep(
+        1,
+        "",
         "Signals extracted from the page",
-        chips(d.signals),
-        el("div", { class: "muted" }, `plus ${d.excerpt.length} characters of its text, given to the model as data, never as instructions`),
+        el("div", {}, chips(d.signals)),
+        el("div", { class: "step-body" }, `plus ${d.excerpt.length} characters of its text, given to the model as data, never as instructions`),
       ),
-      step(
-        "2",
+      pipelineStep(
+        2,
+        VERDICT_TONES[d.verdict] ?? "",
         "The model gave a verdict",
-        el("span", { class: `verdict-${d.verdict ?? "none"}` }, d.verdict ?? "none"),
-        stated,
-        d.reasoning ? el("div", { class: "muted" }, d.reasoning) : null,
+        el("div", {}, el("span", { class: `verdict-${verdict}` }, verdict.replace("_", " ")), el("span", { class: "muted" }, stated)),
+        d.reasoning ? el("div", { class: "reasoning" }, d.reasoning) : null,
       ),
-      step(
-        "3",
+      pipelineStep(
+        3,
+        d.valid ? "good" : "bad",
         "Its evidence was checked against the page",
         d.valid
-          ? el("span", {}, "every signal it cited was really found: ", chips(d.citedSignals.map((id) => ({ id }))))
-          : el("span", { class: "rejected" }, `rejected — ${d.rejection}. It earns nothing and goes to a person.`),
+          ? el("div", { class: "step-row" }, el("span", { class: "step-body" }, "every signal it cited was really found:"), d.citedSignals.map((id) => el("span", { class: "chip found" }, id)))
+          : el("div", { class: "rejected" }, `rejected — ${d.rejection}. It earns nothing and goes to a person.`),
       ),
-      step(
-        "4",
+      pipelineStep(
+        4,
+        "",
         "Permission was checked",
-        checkBadge(d.route),
-        " ",
-        el("span", { class: "muted" }, (REASONS[d.route.reason] ?? [])[1] ?? "Warden blocked this URL on its own."),
+        el(
+          "div",
+          { class: "step-row" },
+          checkBadge(d.route),
+          el("span", { class: "step-body" }, (REASONS[d.route.reason] ?? [])[1] ?? "Warden blocked this URL on its own."),
+        ),
       ),
-      step(
-        "5",
+      pipelineStep(
+        5,
+        "next",
         "Waiting for your judgement",
-        "Nothing about Warden's record has changed yet. Confirming whether this verdict was right is the only thing that moves it.",
+        el("div", { class: "step-body" }, "Nothing about Warden's record has changed yet. Confirming whether this verdict was right is the only thing that moves it."),
+        el(
+          "div",
+          { class: "next-step" },
+          el(
+            "button",
+            {
+              type: "button",
+              onclick: () => {
+                window.location.hash = "#review";
+                requestAnimationFrame(() => highlightNewest(d.decisionId));
+              },
+            },
+            "Judge this verdict →",
+          ),
+          el("span", {}, "under Review, where everything awaiting you is listed"),
+        ),
       ),
     ),
-    el(
-      "div",
-      { class: "next-step" },
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: () => {
-            window.location.hash = "#review";
-            requestAnimationFrame(() => highlightNewest(d.decisionId));
-          },
-        },
-        "Judge this verdict →",
-      ),
-      el("span", { class: "muted" }, "under Review, where everything awaiting you is listed"),
-    ),
-    el("dl", {}, row("Page text the model saw", el("span", { class: "muted" }, excerpt))),
+    el("div", { class: "excerpt" }, el("div", { class: "excerpt-label" }, "Page text the model saw"), el("div", { class: "excerpt-text" }, excerpt)),
   );
 }
 
@@ -1172,18 +1298,31 @@ function chips(signals) {
 
 $("try-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const submit = event.submitter ?? $("try-form").querySelector("button");
+  const submit = event.submitter ?? $("try-form").querySelector("button[type=submit]");
   submit.disabled = true;
+  const url = $("try-url").value;
   const html = $("try-html").value.trim();
   $("try-result").replaceChildren(
     el("p", { class: "empty" }, html === "" ? "Fetching the page, then classifying — this is a live model call…" : "Classifying — this is a live model call…"),
   );
-  const res = await api("POST", "/classify", html === "" ? { url: $("try-url").value } : { url: $("try-url").value, html });
+  const res = await api("POST", "/classify", html === "" ? { url } : { url, html });
   submit.disabled = false;
 
   if (!res.ok) return $("try-result").replaceChildren(el("p", { class: "error" }, explain(res)));
-  $("try-result").replaceChildren(renderClassification(res.data));
+  $("try-result").replaceChildren(renderClassification(res.data, url));
   loadLive();
+});
+
+// Cmd-Enter on a Mac, Ctrl-Enter elsewhere, submits from anywhere on the page — the textarea
+// included, where Enter alone has to stay a newline.
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+$("submit-keys").textContent = MAC ? "⌘ ↵" : "Ctrl ↵";
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || !(MAC ? event.metaKey : event.ctrlKey)) return;
+  if ($("page-try").hidden) return;
+  event.preventDefault();
+  $("try-form").requestSubmit();
 });
 
 // Four pages rather than one long scroll. The number waiting to be reviewed shows on its
@@ -1234,6 +1373,7 @@ for (const [nav] of PAGES) {
 window.addEventListener("hashchange", routeFromHash);
 routeFromHash();
 
+$("demo").replaceChildren(emptyScore());
 loadCorpus();
 loadLive();
 setInterval(loadLive, 15_000);

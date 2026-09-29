@@ -9,182 +9,176 @@
   </head>
   <body>
     <header class="masthead">
-      <div class="brand">
-        <h1>Warden</h1>
-        <p>Phishing triage where the AI has to earn the right to act.</p>
+      <div class="masthead-inner">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"><span></span></span>
+          <span class="brand-name">Warden</span>
+          <span class="brand-rule" aria-hidden="true"></span>
+          <span class="brand-tagline">Phishing triage where the AI has to earn the right to act.</span>
+        </div>
+        <div id="live-status" class="live-status" title="What Warden is currently allowed to do on the pages you send it">
+          <span class="live-status-label">LIVE SYSTEM</span>
+          <span id="live-status-dot" class="live-dot" aria-hidden="true"></span>
+          <span id="live-status-mode" class="live-status-mode">—</span>
+        </div>
+        <nav class="nav" aria-label="Sections">
+          <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
+          <button id="nav-demo" type="button" class="tab">Score a configuration</button>
+          <button id="nav-try" type="button" class="tab">Send a page</button>
+          <button id="nav-review" type="button" class="tab">Review <span id="queue-count" class="queue-count"></span></button>
+        </nav>
       </div>
-      <div id="live-status" class="live-status" title="What Warden is currently allowed to do on the pages you send it">
-        <span class="live-status-label">Live system</span>
-        <span id="live-status-mode" class="live-status-mode">—</span>
-      </div>
-      <nav class="nav" aria-label="Sections">
-        <button id="nav-about" type="button" class="tab current" aria-current="page">How it works</button>
-        <button id="nav-demo" type="button" class="tab">Score a configuration</button>
-        <button id="nav-try" type="button" class="tab">Send a page</button>
-        <button id="nav-review" type="button" class="tab">Review <span id="queue-count" class="queue-count"></span></button>
-      </nav>
     </header>
 
-    <p id="banner" class="banner" role="status" hidden></p>
-
     <main>
-      <section id="page-about" class="hero" aria-labelledby="about-title">
-        <h2 id="about-title">An AI can flag a phishing page in seconds.</h2>
-        <p class="ask">When should it be allowed to block one?</p>
-        <p class="answer">
-          Warden grants permission from reviewed results, limits unreviewed actions, and withdraws permission when an
-          automatic block is confirmed wrong.
-        </p>
-        <p class="scope">Live model calls. Simulated blocks. No websites are taken down.</p>
-        <p class="benefit">
-          Every automatic block is still reviewed. What changes is that the block happens before the review, not
-          after — and no more than three can be waiting at once.
-        </p>
+      <p id="banner" class="banner" role="status" hidden></p>
 
-        <div class="cta-row">
-          <a class="cta" href="#score">Score a configuration</a>
-          <p class="cta-meta">
-            <span class="corpus-size">Labelled</span> pages with known answers · two to three minutes · nothing runs
-            until you start it
-          </p>
-        </div>
-
-        <ol class="ladder" aria-label="How permission is earned and lost">
-          <li class="rung shadow">
-            <span class="rung-name">Recommends only</span>
-            <span class="rung-note">Every verdict goes to a person.</span>
-          </li>
-          <li class="gate"><span>73 reviewed, none wrong</span></li>
-          <li class="rung earning">
-            <span class="rung-name">On trial</span>
-            <span class="rung-note">The evidence clears the threshold. Ten further correct checks in a row complete probation.</span>
-          </li>
-          <li class="gate"><span>10 more in a row</span></li>
-          <li class="rung autonomous">
-            <span class="rung-name">Acts alone</span>
-            <span class="rung-note">May block a URL automatically. At most three blocks can await review.</span>
-            <span class="rung-note">Every block here is simulated.</span>
-          </li>
-        </ol>
-        <p class="trained">
-          <b>Nothing is trained.</b> The model and prompt are fixed; reviewed outcomes move the permission record, not
-          the classifier.
-        </p>
-        <p class="fall">
-          When an automatic block is confirmed wrong, Warden reverses it. An error from the current attempt also
-          withdraws permission and starts a fresh record.
-        </p>
-        <p class="out-of-reach">
-          <b>When a configuration can't qualify, Warden says so.</b> On the evidence so far, this model and prompt will
-          not clear the bar. More pages won't change that — a different model or prompt starts a new record.
-        </p>
-
-        <div class="calc">
-          <h3>How permission is calculated</h3>
-          <p>
-            Warden uses the Wilson lower bound — a cautious estimate of precision that accounts for sample size. Under
-            the default policy, 73 reviewed phishing verdicts with none wrong clear the 95% threshold. Mistakes require
-            more evidence, and ten further correct checks in a row complete probation.
-          </p>
-        </div>
-
-        <div class="facts">
-          <div>
-            <h3>A verdict can't authorise itself</h3>
-            <p>
-              Whether a verdict acts is decided by arithmetic the model can't reach. A page can fool the classifier
-              into a wrong verdict; it can't give itself permission.
-            </p>
+      <section id="page-about" class="page" aria-labelledby="about-title">
+        <div class="intro">
+          <div class="eyebrow">#how-it-works</div>
+          <h1 id="about-title" class="display">
+            An AI can flag a phishing page in seconds.<br /><span>When should it be allowed to block one?</span>
+          </h1>
+          <p class="lede">Warden grants permission from reviewed results, limits unreviewed actions, and withdraws permission when an automatic block is confirmed wrong.</p>
+          <div><span class="scope-pill"><span class="scope-dot" aria-hidden="true"></span>Live model calls. Simulated blocks. No websites are taken down.</span></div>
+          <p class="benefit">Every automatic block is still reviewed. What changes is that the block happens before the review, not after — and no more than three can be waiting at once.</p>
+          <div class="cta-row">
+            <a class="cta" href="#score">Score a configuration<span class="cta-arrow" aria-hidden="true">→</span></a>
+            <span class="cta-meta"><span class="corpus-size">Labelled</span> pages with known answers · two to three minutes · nothing runs until you start it</span>
           </div>
         </div>
 
-        <h3 class="howto-title">Other actions</h3>
-        <ul class="others">
-          <li>
-            <a href="#send">Send a page</a>
-            <span>Classify a page and inspect the verdict, cited evidence and permission decision.</span>
+        <ol class="lifecycle" aria-label="How permission is earned and lost">
+          <li class="stage shadow">
+            <div class="stage-name"><span class="stage-dot" aria-hidden="true"></span>Recommends only</div>
+            <div class="stage-note">Every verdict goes to a person.</div>
           </li>
-          <li>
-            <a href="#review">Review</a>
-            <span>Confirm whether a verdict was correct. Trusted labels update the permission record.</span>
+          <li class="step-arrow"><span class="step-label">73 reviewed, none wrong</span><span class="step-line" aria-hidden="true"></span></li>
+          <li class="stage earning">
+            <div class="stage-name"><span class="stage-dot" aria-hidden="true"></span>On trial</div>
+            <div class="stage-note">The evidence clears the threshold. Ten further correct checks in a row complete probation.</div>
           </li>
-        </ul>
-      </section>
+          <li class="step-arrow"><span class="step-label">10 more in a row</span><span class="step-line" aria-hidden="true"></span></li>
+          <li class="stage autonomous">
+            <div class="stage-name"><span class="stage-dot" aria-hidden="true"></span>Acts alone</div>
+            <div class="stage-note">May block a URL automatically. At most three blocks can await review. Every block here is simulated.</div>
+          </li>
+        </ol>
 
-      <section id="page-try" hidden aria-labelledby="try-title">
-        <div class="section-head">
-          <h2 id="try-title">Send Warden a page</h2>
+        <div class="consequences">
+          <p class="trained"><strong>Nothing is trained.</strong> The model and prompt are fixed; reviewed outcomes move the permission record, not the classifier.</p>
+          <div class="callouts">
+            <div class="callout danger">
+              <span class="callout-icon" aria-hidden="true">!</span>
+              <div>When an automatic block is confirmed wrong, Warden reverses it. An error from the current attempt also withdraws permission and starts a fresh record.</div>
+            </div>
+            <div class="callout">
+              <span class="callout-icon" aria-hidden="true">×</span>
+              <div><strong>When a configuration can't qualify, Warden says so.</strong> On the evidence so far, this model and prompt will not clear the bar. More pages won't change that — a different model or prompt starts a new record.</div>
+            </div>
+          </div>
         </div>
-        <p class="note">
-          Give Warden a URL and it fetches the page and judges it. Any real site works — try your own.
-        </p>
-        <form id="try-form" class="try">
-          <label for="try-url">URL to check</label>
-          <input id="try-url" type="url" required placeholder="https://example.com/login" />
-          <label for="try-pick">…or use one of the example pages</label>
-          <select id="try-pick">
-            <option value="">Choose one, and its URL fills in above…</option>
-          </select>
-          <p class="hint">
-            The example pages are served from this Worker at real URLs, so Warden fetches them exactly as it would
-            anything else. They're written for this project — no live phishing URL is shipped here. Real ones die
-            within hours, and the kits serve something harmless to anything that looks like a datacentre.
-          </p>
-          <details id="try-advanced">
-            <summary>Paste page source instead</summary>
-            <label for="try-html">Page source <span class="muted">— leave empty and Warden fetches the URL</span></label>
-            <textarea id="try-html" rows="6" spellcheck="false" placeholder="Leave empty to fetch the URL above."></textarea>
-            <p id="try-mismatch" class="mismatch" hidden></p>
-          </details>
-          <button type="submit">Classify</button>
-        </form>
-        <div id="try-result"></div>
-      </section>
 
-      <section id="page-review" hidden aria-labelledby="review-title">
-        <div class="section-head">
-          <h2 id="review-title">Review</h2>
-          <button id="reset-live" type="button" class="secondary">Start over</button>
+        <div class="numbered">
+          <div>
+            <div class="number">01</div>
+            <h3>How permission is calculated</h3>
+            <p>Warden uses the Wilson lower bound — a cautious estimate of precision that accounts for sample size. Under the default policy, 73 reviewed phishing verdicts with none wrong clear the 95% threshold. Mistakes require more evidence, and ten further correct checks in a row complete probation.</p>
+          </div>
+          <div>
+            <div class="number">02</div>
+            <h3>A verdict can't authorise itself</h3>
+            <p>Whether a verdict acts is decided by arithmetic the model can't reach. A page can fool the classifier into a wrong verdict; it can't give itself permission.</p>
+          </div>
         </div>
-        <p class="note">
-          Pages you send land here. Confirming a verdict is the only thing that moves Warden's record.
-        </p>
-        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
+
+        <div class="others">
+          <h3>Other actions</h3>
+          <div class="action-cards">
+            <a class="action-card" href="#send">
+              <span><span class="action-title">Send a page</span><span class="action-note">Classify a page and inspect the verdict, cited evidence and permission decision.</span></span>
+              <span class="action-arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="action-card" href="#review">
+              <span><span class="action-title">Review</span><span class="action-note">Confirm whether a verdict was correct. Trusted labels update the permission record.</span></span>
+              <span class="action-arrow" aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
       </section>
 
-      <section id="page-demo" hidden aria-labelledby="demo-title">
-        <div class="section-head">
-          <h2 id="demo-title">Score a configuration</h2>
+      <section id="page-demo" class="page" hidden aria-labelledby="demo-title">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">#score</div>
+            <h2 id="demo-title">Score a configuration</h2>
+          </div>
           <div class="actions">
-            <button id="run-demo" type="button">Score it</button>
             <button id="clear-demo" type="button" class="secondary" hidden>Clear</button>
+            <button id="run-demo" type="button">Score it</button>
           </div>
         </div>
         <div class="gates" aria-label="Two gates">
           <div class="gate-card">
+            <span class="tag">OFFLINE</span>
             <b>This screen qualifies the configuration.</b>
-            <span>
-              Is this model, prompt and policy good enough, on pages whose answers are known, to be worth deploying?
-            </span>
+            <span class="gate-note">Is this model, prompt and policy good enough, on pages whose answers are known, to be worth deploying?</span>
           </div>
           <div class="gate-card">
+            <span class="tag live">LIVE</span>
             <b>The live ledger qualifies the deployment.</b>
-            <span>
-              Whatever this screen says, the live system starts with no permission, and earns it from a person's
-              judgements on real reports under <b>Review</b>. Nothing here grants it anything.
-            </span>
+            <span class="gate-note">Whatever this screen says, the live system starts with no permission, and earns it from a person's judgements on real reports under <strong>Review</strong>. Nothing here grants it anything.</span>
           </div>
         </div>
-        <p class="note">
-          <span class="corpus-size">A set of</span> pages whose real answers are already known, each classified by the
-          live model and checked against that answer. The result is how often its phishing calls are right, with the
-          range its true precision could plausibly fall in. Every verdict is a live model call, so nothing is scripted
-          and the model does get some wrong. Takes two to three minutes; you can leave and come back, and refreshing
-          keeps your place.
-        </p>
-        <div id="demo" class="ledger" aria-live="polite"><p class="empty">Nothing scored yet.</p></div>
+        <p class="note"><span class="corpus-size">A set of</span> pages whose real answers are already known, each classified by the live model and checked against that answer. The result is how often its phishing calls are right, with the range its true precision could plausibly fall in. Every verdict is a live model call, so nothing is scripted and the model does get some wrong. Takes two to three minutes; you can leave and come back, and refreshing keeps your place.</p>
+        <div id="demo" class="ledger" aria-live="polite"></div>
       </section>
 
+      <section id="page-try" class="page" hidden aria-labelledby="try-title">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">#send</div>
+            <h2 id="try-title">Send Warden a page</h2>
+            <p class="note">Give Warden a URL and it fetches the page and judges it. Any real site works — try your own.</p>
+          </div>
+        </div>
+        <form id="try-form" class="panel try">
+          <label class="field" for="try-url">
+            <span class="field-label">URL to check</span>
+            <span class="url-input"><span class="method" aria-hidden="true">GET</span><input id="try-url" type="url" required placeholder="https://example.com/login" /></span>
+          </label>
+          <label class="field" for="try-pick">
+            <span class="field-label">…or use one of the example pages</span>
+            <select id="try-pick">
+              <option value="">Choose one, and its URL fills in above…</option>
+            </select>
+          </label>
+          <p class="hint">The example pages are served from this Worker at real URLs, so Warden fetches them exactly as it would anything else. They're written for this project — no live phishing URL is shipped here. Real ones die within hours, and the kits serve something harmless to anything that looks like a datacentre.</p>
+          <details id="try-advanced" class="paste">
+            <summary><span class="plus" aria-hidden="true">+</span>Paste page source instead</summary>
+            <label class="visually-hidden" for="try-html">Page source — leave empty and Warden fetches the URL</label>
+            <textarea id="try-html" rows="6" spellcheck="false" placeholder="Leave empty to fetch the URL above."></textarea>
+            <p id="try-mismatch" class="mismatch" hidden></p>
+          </details>
+          <div class="submit-row">
+            <button type="submit">Classify</button>
+            <span id="submit-keys" class="kbd" aria-hidden="true">Ctrl ↵</span>
+          </div>
+        </form>
+        <div id="try-result"></div>
+      </section>
+
+      <section id="page-review" class="page" hidden aria-labelledby="review-title">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">#review</div>
+            <h2 id="review-title">Review</h2>
+            <p class="note">Pages you send land here. Confirming a verdict is the only thing that moves Warden's record.</p>
+          </div>
+          <button id="reset-live" type="button" class="secondary">Start over</button>
+        </div>
+        <div id="live" class="ledger"><p class="empty">Loading…</p></div>
+      </section>
     </main>
   </body>
 </html>
