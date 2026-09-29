@@ -265,9 +265,9 @@ async function watchDemoRun(
   _dependencies: Dependencies,
   [runId]: readonly string[],
 ): Promise<Response> {
-  if (!runId || !RUN_ID.test(runId)) return problem(404, "not_found", "There is no such demo run.");
+  if (!runId || !RUN_ID.test(runId)) return problem(404, "not_found", "There is no such scoring run.");
   const state = await env.LEDGER.get(env.LEDGER.idFromName(`demo:${runId}`)).state();
-  if (!state || state.kind !== "demo") return problem(404, "not_found", "There is no such demo run.");
+  if (!state || state.kind !== "demo") return problem(404, "not_found", "There is no such scoring run.");
   return json({
     ...state,
     policy: DEFAULT_POLICY,

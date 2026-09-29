@@ -41,27 +41,28 @@ function styled(node, property, value) {
   return node;
 }
 
-// Which run this tab is watching. No credential is ever held here: a local run needs none,
-// and a deployed one is driven by the CLI, which reads its token from the environment.
+// The last run this browser watched, so a bare #score reopens it. The address bar is what
+// really carries a run (#score/<id>), so a link works in any browser. No credential is ever
+// held here: a local run needs none, and a deployed one is driven with its token instead.
 const RUN_KEY = "warden-demo-run";
 
-/** Reads a per-tab value, or "" when there is none or storage is blocked. */
+/** Reads a remembered value, or "" when there is none or storage is blocked. */
 function stored(key) {
   try {
-    return sessionStorage.getItem(key) ?? "";
+    return localStorage.getItem(key) ?? "";
   } catch {
     return "";
   }
 }
 
-/** Saves a per-tab value; an empty value removes it. Storage is a convenience, so failures are ignored. */
+/** Remembers a value; an empty value removes it. Storage is a convenience, so failures are ignored. */
 function store(key, value) {
   try {
     if (!value) {
-      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
       return;
     }
-    sessionStorage.setItem(key, value);
+    localStorage.setItem(key, value);
   } catch {
     // Without storage the value just isn't remembered.
   }
@@ -1205,9 +1206,22 @@ $("demo").addEventListener("rerender", () => {
   if (lastDemoState) renderEvaluation($("demo"), lastDemoState);
 });
 
+// The run on screen, whose id the Score tab and the address bar carry.
+let watchingRunId = null;
+
+/** Puts the run being watched in the address bar, when the Score page is the one showing. */
+function runInAddress(runId) {
+  if (!window.location.hash.startsWith("#score")) return;
+  const wanted = runId ? `#score/${runId}` : "#score";
+  if (window.location.hash !== wanted) history.replaceState(null, "", wanted);
+}
+
 /** Shows a scoring run and keeps polling it while it runs. */
 async function watchDemo(runId) {
   clearTimeout(demoTimer);
+  watchingRunId = runId;
+  store(RUN_KEY, runId);
+  runInAddress(runId);
   const res = await api("GET", `/demo/runs/${encodeURIComponent(runId)}`);
   if (!res.ok) return demoUnavailable(res);
   // A run that never started has nothing to score; there is nothing to show but the button.
@@ -1226,21 +1240,25 @@ async function watchDemo(runId) {
 function demoUnavailable(res) {
   $("demo").replaceChildren(el("p", { class: "error" }, explain(res)));
   $("run-demo").disabled = false;
-  if (res.status === 404) store(RUN_KEY, "");
+  if (res.status !== 404) return;
+  store(RUN_KEY, "");
+  watchingRunId = null;
 }
 
 $("run-demo").addEventListener("click", async () => {
   $("run-demo").disabled = true;
   const res = await api("POST", "/demo/runs");
   if (!res.ok) return demoUnavailable(res);
-  store(RUN_KEY, res.data.runId);
-  watchDemo(res.data.runId);
+  // A new entry in the history, so Back returns to the previous run.
+  window.location.hash = `#score/${res.data.runId}`;
 });
 
 // Each scoring run already gets its own ledger, so running again is the reset. Clearing only
 // stops showing the old one, and costs nothing.
 $("clear-demo").addEventListener("click", () => {
   store(RUN_KEY, "");
+  watchingRunId = null;
+  runInAddress(null);
   lastDemoState = null;
   clearTimeout(demoTimer);
   $("demo").replaceChildren(emptyScore());
@@ -1495,24 +1513,36 @@ const ROUTES = {
   "#demo": "nav-demo",
 };
 
-/** Shows the page the address bar names, or How it works for anything it doesn't. */
+// A scoring run's own address: #score/<run id>.
+const RUN_ROUTE = /^#score\/([0-9a-f-]{36})$/i;
+
+/** Shows the page the address bar names, or How it works for anything it doesn't; a run's address also opens that run. */
 function routeFromHash() {
-  showPage(ROUTES[window.location.hash] ?? "nav-about");
+  const run = RUN_ROUTE.exec(window.location.hash);
+  if (!run) {
+    showPage(ROUTES[window.location.hash] ?? "nav-about");
+    runInAddress(watchingRunId);
+    return;
+  }
+  showPage("nav-demo");
+  if (run[1] !== watchingRunId) watchDemo(run[1]);
 }
 
 for (const [nav] of PAGES) {
   const hash = Object.keys(ROUTES).find((key) => ROUTES[key] === nav);
   $(nav).addEventListener("click", () => {
-    window.location.hash = hash;
+    // The Score tab goes back to the run on screen, not to an empty page.
+    window.location.hash = nav === "nav-demo" && watchingRunId ? `#score/${watchingRunId}` : hash;
   });
 }
 
+$("demo").replaceChildren(emptyScore());
 window.addEventListener("hashchange", routeFromHash);
 routeFromHash();
 
-$("demo").replaceChildren(emptyScore());
 loadCorpus();
 loadLive();
 setInterval(loadLive, 15_000);
+// No run in the address: reopen the last one this browser watched, if any.
 const lastRun = stored(RUN_KEY);
-if (lastRun) watchDemo(lastRun);
+if (!watchingRunId && lastRun) watchDemo(lastRun);
