@@ -798,9 +798,13 @@ function summaryTiles(record) {
     { class: "tiles" },
     tile("Can it act alone?", el("span", { class: `state ${shown}`, title: state.detail }, state.label), attempt),
     tile(
-      "Precision we can prove",
+      // After a revocation the record restarts, so this is no longer the whole-run figure;
+      // say so, or it reads as contradicting the configuration's score.
+      permission.epoch > 1 ? "Precision proven this attempt" : "Precision we can prove",
       boundPct(bound, policy.requiredScore),
-      `needs ${pct(policy.requiredScore)} — the worst its true precision could plausibly be, not its average`,
+      permission.epoch > 1
+        ? `from ${permission.right} of ${n} since the revocation · needs ${pct(policy.requiredScore)} · the worst plausible, not the average`
+        : `needs ${pct(policy.requiredScore)} — the worst its true precision could plausibly be, not its average`,
       meter(bound ?? 0, policy.requiredScore),
     ),
     tile("Confirmed correct", `${permission.right} of ${n}`, `${permission.wrong} wrong since the last reset`),
