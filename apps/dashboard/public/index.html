@@ -29,73 +29,86 @@
 
     <main>
       <section id="page-about" class="hero" aria-labelledby="about-title">
-        <h2 id="about-title">An AI can spot a phishing page in a second.</h2>
-        <p class="ask">Should it be allowed to take that page down by itself?</p>
+        <h2 id="about-title">An AI can flag a phishing page in seconds.</h2>
+        <p class="ask">When should it be allowed to block one?</p>
         <p class="answer">
-          Warden's answer: <b>not until it has proved it</b>, and only until one of its blocks turns out to be wrong.
+          Warden grants permission from reviewed results, limits unreviewed actions, and withdraws permission when an
+          automatic block is confirmed wrong.
         </p>
+        <p class="scope">Live model calls. Simulated blocks. No websites are taken down.</p>
+        <p class="benefit">
+          Every automatic block is still reviewed. What changes is that the block happens before the review, not
+          after — and no more than three can be waiting at once.
+        </p>
+
+        <div class="cta-row">
+          <a class="cta" href="#score">Score a configuration</a>
+          <p class="cta-meta">
+            <span class="corpus-size">Labelled</span> pages with known answers · two to three minutes · nothing runs
+            until you start it
+          </p>
+        </div>
 
         <ol class="ladder" aria-label="How permission is earned and lost">
           <li class="rung shadow">
             <span class="rung-name">Recommends only</span>
             <span class="rung-note">Every verdict goes to a person.</span>
           </li>
-          <li class="gate" aria-hidden="true"><span>73 confirmed correct</span></li>
+          <li class="gate"><span>73 reviewed, none wrong</span></li>
           <li class="rung earning">
             <span class="rung-name">On trial</span>
-            <span class="rung-note">Cleared the bar, but still can't act. Ten clean checks to go.</span>
+            <span class="rung-note">The evidence clears the threshold. Ten further correct checks in a row complete probation.</span>
           </li>
-          <li class="gate" aria-hidden="true"><span>10 more in a row</span></li>
+          <li class="gate"><span>10 more in a row</span></li>
           <li class="rung autonomous">
             <span class="rung-name">Acts alone</span>
-            <span class="rung-note">Blocks a URL itself. Three at most await review.</span>
+            <span class="rung-note">May block a URL automatically. At most three blocks can await review.</span>
+            <span class="rung-note">Every block here is simulated.</span>
           </li>
         </ol>
-        <p class="fall">One wrong block and it falls all the way back. The block is undone and counting starts from zero.</p>
-        <p class="out-of-reach">
-          If the evidence says it can never clear the bar, Warden says so instead of waiting forever. A different
-          model or prompt starts a new record.
+        <p class="trained">
+          <b>Nothing is trained.</b> The model and prompt are fixed; reviewed outcomes move the permission record, not
+          the classifier.
         </p>
+        <p class="fall">
+          When an automatic block is confirmed wrong, Warden reverses it. An error from the current attempt also
+          withdraws permission and starts a fresh record.
+        </p>
+        <p class="out-of-reach">
+          <b>When a configuration can't qualify, Warden says so.</b> On the evidence so far, this model and prompt will
+          not clear the bar. More pages won't change that — a different model or prompt starts a new record.
+        </p>
+
+        <details class="calc">
+          <summary>How permission is calculated</summary>
+          <p>
+            Warden uses the Wilson lower bound — a cautious estimate of precision that accounts for sample size. Under
+            the default policy, 73 reviewed phishing verdicts with none wrong clear the 95% threshold. Mistakes require
+            more evidence, and ten further correct checks in a row complete probation.
+          </p>
+        </details>
 
         <div class="facts">
           <div>
-            <h3>Nothing is trained</h3>
-            <p>
-              The model and prompt are fixed. Warden measures a classifier and decides what it may do; nothing it gets
-              right or wrong feeds back in.
-            </p>
-          </div>
-          <div>
             <h3>A verdict can't authorise itself</h3>
             <p>
-              Whether a verdict acts is decided by arithmetic the model can't reach. A page that fools the classifier
-              still doesn't get a block.
+              Whether a verdict acts is decided by arithmetic the model can't reach. A page can fool the classifier
+              into a wrong verdict; it can't give itself permission.
             </p>
-          </div>
-          <div>
-            <h3>73 is not arbitrary</h3>
-            <p>Three right out of three is 100% and proves nothing. 73 is where the evidence starts to mean something.</p>
           </div>
         </div>
 
-        <h3 class="howto-title">How to use this</h3>
-        <ol class="howto">
+        <h3 class="howto-title">Other actions</h3>
+        <ul class="others">
           <li>
-            <b>Score a configuration</b>
-            <span>
-              Start here. <span class="corpus-size">A set of</span> pages with known answers, run through the live
-              model: does it clear the bar, not yet, or never? Two to three minutes.
-            </span>
+            <a href="#send">Send a page</a>
+            <span>Classify a page and inspect the verdict, cited evidence and permission decision.</span>
           </li>
           <li>
-            <b>Send a page</b>
-            <span>Try one yourself and watch each step.</span>
+            <a href="#review">Review</a>
+            <span>Confirm whether a verdict was correct. Trusted labels update the permission record.</span>
           </li>
-          <li>
-            <b>Review</b>
-            <span>Say whether a verdict was right. Only this moves the record.</span>
-          </li>
-        </ol>
+        </ul>
       </section>
 
       <section id="page-try" hidden aria-labelledby="try-title">
@@ -165,7 +178,7 @@
         <p class="note">
           <span class="corpus-size">A set of</span> pages whose real answers are already known, each classified by the
           live model and checked against that answer. The result is how often its phishing calls are right, with the
-          range its true accuracy could plausibly fall in. Every verdict is a live model call, so nothing is scripted
+          range its true precision could plausibly fall in. Every verdict is a live model call, so nothing is scripted
           and the model does get some wrong. Takes two to three minutes; you can leave and come back, and refreshing
           keeps your place.
         </p>

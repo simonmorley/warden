@@ -133,7 +133,7 @@ function wilson(right, n, z) {
   return Math.min(1, Math.max(0, lower));
 }
 
-/** How many more correct calls it takes before the proven accuracy reaches the bar. */
+/** How many more correct calls it takes before the proven precision reaches the bar. */
 function correctCallsStillNeeded(right, wrong, policy) {
   for (let more = 0; more <= 10_000; more++) {
     const bound = wilson(right + more, right + wrong + more, policy.z);
@@ -153,7 +153,7 @@ const STATES = {
   SHADOW: { label: "Recommends only", detail: "Everything goes to a person. Nothing is blocked automatically." },
   EARNING: { label: "On trial", detail: "The evidence is strong enough, but it must hold before it may act." },
   AUTONOMOUS: { label: "Acts alone", detail: "It may block a URL by itself, within the limits shown." },
-  // Reported, not stored: SHADOW whose record puts the ceiling on its accuracy under the bar.
+  // Reported, not stored: SHADOW whose record puts the ceiling on its precision under the bar.
   UNQUALIFIABLE: {
     label: "Can't qualify",
     detail: "Everything goes to a person, and on this evidence the bar is out of reach: more of the same won't clear it.",
@@ -198,7 +198,7 @@ function tile(label, value, sub, extra) {
 
 /** The numbers an event was decided on. */
 function tally(t) {
-  return `${t.right} correct of ${t.right + t.wrong} · proven accuracy ${pct(t.bound)}`;
+  return `${t.right} correct of ${t.right + t.wrong} · proven precision ${pct(t.bound)}`;
 }
 
 /** What each change actually means for what Warden may do next. */
@@ -281,7 +281,7 @@ function renderLedger(container, state, { onLabel } = {}) {
 
 /**
  * Renders a scoring run as the evaluation it is: the result first, then the result broken
- * down by campaign, then — set apart — what that accuracy would do to permission on live
+ * down by campaign, then — set apart — what that precision would do to permission on live
  * traffic, rehearsed on the run's own throwaway ledger.
  */
 function renderEvaluation(container, state) {
@@ -292,14 +292,14 @@ function renderEvaluation(container, state) {
     runStatus(state.run, state),
     resultPanel(state),
     ...decisionFeed(state, view, container),
-    el("h3", { class: "arc-title" }, "What this accuracy would do on live traffic"),
+    el("h3", { class: "arc-title" }, "What this precision would do on live traffic"),
     el(
       "p",
       { class: "sandbox" },
       el("b", {}, "A rehearsal, not a grant. "),
       "The same pages, replayed through Warden's permission rules on a throwaway ledger as if each were a real report " +
         "and each known answer an analyst's judgement. It shows how permission would be earned, used and lost at this " +
-        "accuracy. Nothing here carries over: the live system starts from zero whatever this shows.",
+        "precision. Nothing here carries over: the live system starts from zero whatever this shows.",
     ),
     ladder(state),
     story(state, state.run),
@@ -342,7 +342,7 @@ const QUALIFICATIONS = {
   clears: {
     title: "Clears the bar",
     meaning: ({ lower }) =>
-      `The worst its accuracy could plausibly be is ${pct(lower)}, at or above the bar. Worth deploying — where it ` +
+      `The worst its precision could plausibly be is ${pct(lower)}, at or above the bar. Worth deploying — where it ` +
       "still starts with no permission, and has to earn it again from real reports.",
   },
   not_yet: {
@@ -355,12 +355,12 @@ const QUALIFICATIONS = {
   unqualifiable: {
     title: "Unqualifiable",
     meaning: ({ upper }) =>
-      `The best its accuracy could plausibly be is ${pct(upper)}, under the bar. More pages won't change that. ` +
-      "Change the model or the prompt — which makes a new configuration, scored from zero.",
+      `The best its precision could plausibly be is ${pct(upper)}, under the bar. On the evidence so far, this ` +
+      "model and prompt will not clear the bar. More pages won't change that — a different model or prompt starts a new record.",
   },
 };
 
-/** The result, first: measured accuracy on the labelled corpus, and whether it clears the bar. */
+/** The result, first: measured precision on the labelled corpus, and whether it clears the bar. */
 function resultPanel({ evaluation, policy, run, scope }) {
   const { qualification, phishingCalls: calls, allCalls: all } = evaluation;
   const verdict = QUALIFICATIONS[qualification];
@@ -383,7 +383,7 @@ function resultPanel({ evaluation, policy, run, scope }) {
       el(
         "span",
         { class: "measured-label" },
-        n === 0 ? "measured accuracy" : `measured accuracy — ${calls.right} of ${plural(n, "phishing call")} right`,
+        n === 0 ? "measured precision" : `measured precision — ${calls.right} of ${plural(n, "phishing call")} right`,
       ),
     ),
     n === 0
@@ -391,7 +391,7 @@ function resultPanel({ evaluation, policy, run, scope }) {
       : el(
           "p",
           {},
-          `Its true accuracy is plausibly between ${pct(calls.lower)} and ${pct(calls.upper)}. `,
+          `Its true precision is plausibly between ${pct(calls.lower)} and ${pct(calls.upper)}. `,
           `To clear the bar, the lower end must reach ${pct(policy.requiredScore)}.`,
         ),
     el("p", {}, verdict.meaning(calls)),
@@ -420,7 +420,7 @@ function recordPanel(state) {
   if (permission.right + permission.wrong > 0) {
     return [
       summaryTiles(state),
-      el("p", { class: "hint" }, "Proven accuracy is recomputed in your browser from the counts above, using the server's own policy."),
+      el("p", { class: "hint" }, "Proven precision is recomputed in your browser from the counts above, using the server's own policy."),
     ];
   }
 
@@ -486,7 +486,7 @@ function ladder(state) {
         el("span", { class: "rung-note" }, state.permission.state === key ? hereNote(state) : note),
       );
       if (index === rungs.length - 1) return [rung];
-      return [rung, el("li", { class: "gate", "aria-hidden": "true" }, el("span", {}, index === 0 ? "73 confirmed correct" : "10 more in a row"))];
+      return [rung, el("li", { class: "gate", "aria-hidden": "true" }, el("span", {}, index === 0 ? "73 reviewed, none wrong" : "10 more in a row"))];
     }),
   );
 }
@@ -553,9 +553,9 @@ function summaryTiles(record) {
     { class: "tiles" },
     tile("Can it act alone?", el("span", { class: `state ${shown}`, title: state.detail }, state.label), attempt),
     tile(
-      "Accuracy we can prove",
+      "Precision we can prove",
       pct(bound),
-      `needs ${pct(policy.requiredScore)} — the worst its true accuracy could plausibly be, not its average`,
+      `needs ${pct(policy.requiredScore)} — the worst its true precision could plausibly be, not its average`,
       el("progress", { value: bound ?? 0, max: 1 }),
     ),
     tile("Confirmed correct", `${permission.right} of ${n}`, `${permission.wrong} wrong since the last reset`),
@@ -579,7 +579,7 @@ function summaryTiles(record) {
  */
 function stillNeededTile(shown, stillNeeded) {
   if (shown === "UNQUALIFIABLE") {
-    return tile("Still needed", "out of reach", "the best its accuracy could plausibly be is under the bar");
+    return tile("Still needed", "out of reach", "the best its precision could plausibly be is under the bar");
   }
   const value = shown === "SHADOW" && stillNeeded !== null ? `${stillNeeded} more` : "none";
   return tile("Still needed", value, "correct calls before it could be trusted to act");
