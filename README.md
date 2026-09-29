@@ -224,7 +224,3 @@ Most of the code-quality rules came from reading what it wrote: guard clauses in
 **Where it was good.** It found a contradiction in the PRD before any code existed: one section said a mistake's cost depended on the current state and another said it depended on whether the verdict had been acted on. It proposed the evidence rule while writing the inference adapter's tests. It measured the models rather than guessing, and it noticed from a live run that the cap of three never actually bound in the demo, because every block was being reviewed the instant it was made. The fix, making review lag behind for part of the run, is in the decision log.
 
 `docs/decision-log.md` records every design change since the design docs were written, with what raised it.
-
-## Licence
-
-MIT, in `LICENSE`. The IBM Plex fonts the dashboard ships are under the SIL Open Font License, alongside them in `apps/dashboard/public/fonts/`.
