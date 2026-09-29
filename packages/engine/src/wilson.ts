@@ -7,6 +7,25 @@
  * Returns null when there is no evidence at all, rather than inventing a number.
  */
 export function wilsonLowerBound(right: number, n: number, z: number): number | null {
+  const interval = wilsonInterval(right, n, z);
+  if (!interval) return null;
+  return clamp(interval.centre - interval.margin);
+}
+
+/**
+ * The Wilson score upper bound: the highest the true rate could plausibly be. Once it falls
+ * below the bar, no amount of further evidence at this hit rate will clear it (PRD 6.3).
+ *
+ * The same formula with the sign flipped, at the same `z`. Returns null with no evidence.
+ */
+export function wilsonUpperBound(right: number, n: number, z: number): number | null {
+  const interval = wilsonInterval(right, n, z);
+  if (!interval) return null;
+  return clamp(interval.centre + interval.margin);
+}
+
+/** The interval's centre and half-width, both already divided through; null with no evidence. */
+function wilsonInterval(right: number, n: number, z: number): { centre: number; margin: number } | null {
   if (!Number.isInteger(right) || !Number.isInteger(n) || right < 0 || right > n) {
     throw new RangeError(`need whole counts with 0 <= right <= n, got right=${right}, n=${n}`);
   }
@@ -17,10 +36,14 @@ export function wilsonLowerBound(right: number, n: number, z: number): number | 
 
   const p = right / n;
   const z2 = z * z;
-  const centre = p + z2 / (2 * n);
-  const margin = z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n));
-  const lower = (centre - margin) / (1 + z2 / n);
+  const scale = 1 + z2 / n;
+  return {
+    centre: (p + z2 / (2 * n)) / scale,
+    margin: (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / scale,
+  };
+}
 
-  // Rounding can leave a hair outside [0, 1] at the extremes (p = 0 or p = 1).
-  return Math.min(1, Math.max(0, lower));
+/** Rounding can leave a hair outside [0, 1] at the extremes (p = 0 or p = 1). */
+function clamp(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }

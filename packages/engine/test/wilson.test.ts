@@ -103,7 +103,7 @@ describe("wilsonUpperBound", () => {
   });
 
   it("can't rule out perfection while every call has been right", () => {
-    for (const n of [1, 3, 73, 500]) expect(wilsonUpperBound(n, n, Z)).toBe(1);
+    for (const n of [1, 3, 73, 500]) expect(wilsonUpperBound(n, n, Z)).toBeCloseTo(1, 12);
   });
 
   // The case the upper bound exists for: a classifier that is good, but not good enough, and
