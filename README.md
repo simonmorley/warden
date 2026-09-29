@@ -74,17 +74,15 @@ CLOUDFLARE_ACCOUNT_ID=...
 
 The scripts load that file into Wrangler's process with Node's `--env-file-if-exists`. The Worker itself never sees it. (Wrangler's own `--env-file` flag would hand it to the Worker as a binding, and the Worker has no business holding an account credential.)
 
-To make the token, go to **My Profile → API Tokens → Create Token**, start from the **Edit Cloudflare Workers** template, and add two permissions:
+To make the token, go to **My Profile → API Tokens → Create Token → Create Custom Token** and give it three permissions:
 
 | Permission | Why |
 | --- | --- |
-| Account · Workers Scripts · Edit | Run and deploy the Worker (in the template) |
-| Account · Account Settings · Read | Wrangler reads the account (in the template) |
-| User · User Details · Read, User · Memberships · Read | Wrangler identifies you (in the template) |
-| **Account · Workers AI · Read** | Call the model. Not in the template |
-| **Account · Workers AI · Edit** | Cloudflare asks for both for Workers AI. Not in the template |
+| Account · Workers AI · Edit | Call the model |
+| Account · Workers Scripts · Edit | Run and deploy the Worker |
+| Account · Account Settings · Read | Let Wrangler read the account |
 
-Limit the token to the one account you're using. Cloudflare doesn't publish an exact minimum for `wrangler dev` with a remote AI binding, so this is the set I'd use rather than a guaranteed floor. AI Gateway needs nothing extra: calls through the binding are already authenticated.
+Limit it to the one account you're using. AI Gateway isn't required, so it needs no permission here.
 
 **Warden's own token** (`WARDEN_TOKEN`) is the bearer token a deployed copy requires for anything that changes state or spends inference. Locally you don't need it, because `WARDEN_OPEN=true` covers that. For a deployment, see below.
 
