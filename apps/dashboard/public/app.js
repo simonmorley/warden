@@ -477,19 +477,19 @@ function placeholders() {
 
 /**
  * Renders a scoring run as the evaluation it is: the result first, then the result broken
- * down by page design, then — set apart — what that precision would do to permission on live
+ * down to what it got wrong, then — set apart — what that precision would do to permission on live
  * traffic, rehearsed on the run's own throwaway ledger.
  */
 function renderEvaluation(container, state) {
   const urls = new Map(state.decisions.map((decision) => [decision.id, decision.url]));
-  // By design is the result broken down; the other views are there to dig into it.
-  const view = views.get(container.id) ?? "campaigns";
+  // What it got wrong is the result that matters; the other views are there to dig in.
+  const view = views.get(container.id) ?? "wrong";
   container.replaceChildren(
     runStatus(state.run, state),
     el("div", { class: "section-eyebrow" }, "1 · The answer: is this model, prompt and policy good enough?"),
     resultPanel(state),
-    el("div", { class: "section-eyebrow" }, "2 · Where it was right and where it was wrong"),
-    decisionFeed(state, view, container),
+    el("div", { class: "section-eyebrow" }, "2 · What it got wrong"),
+    decisionFeed(state, view, container, undefined, SCORE_VIEWS),
     el(
       "div",
       { class: "arc" },
@@ -947,39 +947,104 @@ function mattered(decision) {
   return false;
 }
 
+// Which views each record offers. Scoring leads with what the model got wrong; Review with
+// what a reviewer should look at.
+const SCORE_VIEWS = [
+  ["wrong", "What it got wrong"],
+  ["campaigns", "Grouped"],
+  ["all", "Every page"],
+];
+const REVIEW_VIEWS = [
+  ["campaigns", "Grouped"],
+  ["mattered", "What mattered"],
+  ["all", "Everything"],
+];
+
 /** The decision feed: heading, view switch, caption and table. */
-function decisionFeed(state, view, container, onLabel) {
+function decisionFeed(state, view, container, onLabel, choices = REVIEW_VIEWS) {
   const { decisions } = state;
   if (decisions.length === 0) {
     return el("div", { class: "section" }, el("h3", {}, "Decisions"), el("p", { class: "empty" }, "Nothing classified yet."));
   }
 
-  const showing =
-    view === "campaigns"
-      ? new Set(decisions.map((d) => pageOf(d.url)?.campaign ?? "unknown")).size
-      : (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
-  const label =
-    view === "campaigns"
-      ? `Decisions — ${plural(decisions.length, "page")}, ${plural(showing, "design")}`
-      : `Decisions — showing ${showing} of ${decisions.length}`;
   const heading = el(
     "div",
     { class: "feed-head" },
-    el("h3", {}, label),
+    el("h3", {}, feedTitle(decisions, view)),
     el(
       "div",
       { class: "views", role: "group", "aria-label": "How much to show" },
-      viewButton("campaigns", "By design", view, container),
-      viewButton("mattered", "What mattered", view, container),
-      viewButton("all", "Everything", view, container),
+      choices.map(([id, label]) => viewButton(id, label, view, container)),
     ),
   );
   const caption = el("p", { class: "note" }, captionFor(view, state));
   return el("div", { class: "section" }, heading, caption, feedBody(decisions, view, container, onLabel));
 }
 
+/** The feed's heading for the chosen view. */
+function feedTitle(decisions, view) {
+  if (view === "wrong") {
+    const wrong = decisions.filter((decision) => decision.label === "wrong").length;
+    const unsure = decisions.filter(gotWrong).length - wrong;
+    return `${wrong} wrong, ${unsure} unsure, out of ${plural(decisions.length, "page")}`;
+  }
+  if (view === "campaigns") return `Decisions: ${plural(decisions.length, "page")}, grouped`;
+  const showing = (view === "mattered" ? decisions.filter(mattered) : decisions.slice(-120)).length;
+  return `Decisions: showing ${showing} of ${decisions.length}`;
+}
+
+/** Whether the model got a page wrong, or couldn't give a usable answer about it. */
+function gotWrong(decision) {
+  return decision.label === "wrong" || !decision.valid || decision.verdict === "uncertain";
+}
+
+/** Why an answer was rejected, in words. */
+const REJECTIONS = {
+  schema: "the answer was malformed",
+  unresolved_signal: "it cited evidence that isn't on the page",
+  no_evidence: "it said phishing but cited no evidence",
+  timeout: "the model took too long",
+  provider_error: "the model call failed",
+};
+
+/** What the model did with a page it got wrong or couldn't answer, in one plain sentence. */
+function whatItDid(decision) {
+  if (!decision.valid) return `Its answer was rejected (${REJECTIONS[decision.rejection] ?? decision.rejection}), so a person decides.`;
+  if (decision.verdict === "uncertain") return "It wasn't sure, so a person decides.";
+  if (decision.verdict === "phishing") return "Called it phishing. Wrong: the page is legitimate.";
+  return "Called it safe. Wrong: it's phishing.";
+}
+
+/** The pages the model got wrong or couldn't answer, the mistakes first, repeats counted once. */
+function wrongTable(decisions) {
+  const groups = new Map();
+  for (const decision of decisions.filter(gotWrong)) {
+    const page = pageOf(decision.url);
+    const said = whatItDid(decision);
+    const key = `${page?.technique ?? decision.url}|${said}`;
+    const group = groups.get(key) ?? { page, url: decision.url, said, mistake: decision.label === "wrong", count: 0 };
+    group.count++;
+    groups.set(key, group);
+  }
+  if (groups.size === 0) return el("p", { class: "empty" }, "It got every page right.");
+
+  const rows = [...groups.values()]
+    .sort((a, b) => Number(b.mistake) - Number(a.mistake) || b.count - a.count)
+    .map((group) =>
+      el(
+        "tr",
+        {},
+        el("td", {}, el("div", { class: "technique" }, group.page?.technique ?? group.url), truthMark(group.page?.truth)),
+        el("td", { class: group.mistake ? "label-wrong" : "muted" }, group.said),
+        el("td", { class: "num" }, String(group.count)),
+      ),
+    );
+  return feedTable(["Page", "What the model did", "Pages"], rows);
+}
+
 /** The table for the chosen view. */
 function feedBody(decisions, view, container, onLabel) {
+  if (view === "wrong") return wrongTable(decisions);
   if (view === "campaigns") return campaignTable(decisions);
   if (view === "all") return decisionTable(decisions.slice(-120).reverse(), onLabel);
   const notable = decisions.filter(mattered);
@@ -989,19 +1054,20 @@ function feedBody(decisions, view, container, onLabel) {
 
 /** Explains what the current view shows, and where these pages came from. */
 function captionFor(view, state) {
-  const built = corpusInWords();
-  if (view === "campaigns") {
-    return `${built} One row per design, with its copies counted together. Copies of the same page nearly always get the same answer.`;
+  if (view === "wrong") {
+    const right = state.decisions.length - state.decisions.filter(gotWrong).length;
+    return `The pages it got wrong, and the ones it wasn't sure about and handed to a person. It got the other ${right} right.`;
   }
+  const built = corpusInWords();
+  if (view === "campaigns") return `${built} Each row is one fake page and its copies, counted together.`;
   if (view === "all") return `${built} Every decision, newest first.`;
   const hidden = state.decisions.length - state.decisions.filter(mattered).length;
   return `${built} Showing only what a reviewer would want: mistakes, rejected answers, pages Warden refused to act on, and blocks that were undone. ${hidden} routine calls are hidden.`;
 }
 
 /**
- * What the test pages are, in plain words, counted from the pages themselves: how many phishing
- * designs, how many copies of each, and how many one-offs, without security jargon: what the
- * trade calls a campaign is said here as a design and its copies.
+ * What the test pages are, in plain words, counted from the pages themselves: how many fake
+ * pages, how many copies of each, and how many one-offs. No security jargon.
  */
 function corpusInWords() {
   if (!corpus.summary) return "";
@@ -1012,9 +1078,9 @@ function corpusInWords() {
   const copies = copied.length > 0 ? Math.max(...copied) : 0;
   return (
     `${corpus.summary.pages} test pages, all written for this project: none is copied from real phishing. ` +
-    `${plural(copied.length, "fake page design")}, each copied onto ${copies} different made-up web addresses, the way ` +
-    `attackers put one fake page up on many sites at once. The other ${oneOffs} pages are one-offs: real-looking ` +
-    `legitimate pages, harmless pages, and the traps.`
+    `${plural(copied.length, "fake phishing page")}, each copied onto ${copies} made-up web addresses, the way ` +
+    `attackers put one page up on many sites at once, plus ${oneOffs} one-off pages: real-looking legitimate ` +
+    `pages, harmless pages, and the traps.`
   );
 }
 
@@ -1092,7 +1158,7 @@ function matteredTable(notable, container) {
 
 /** How a decision ended, in the words a reviewer would use to describe it. */
 function outcomeOf(decision) {
-  if (!decision.valid) return `answer rejected: ${decision.rejection}`;
+  if (!decision.valid) return `answer rejected: ${REJECTIONS[decision.rejection] ?? decision.rejection}`;
   if (decision.block === "reversed") return "blocked, then undone as wrong";
   if (decision.label === "wrong") return "verdict was wrong";
   if (decision.verdict === "uncertain") return "model would not commit";
@@ -1137,7 +1203,7 @@ function campaignTable(decisions) {
       el("td", { class: "num muted" }, String(family.unusable)),
     ),
   );
-  return feedTable(["Design", "What it is", "Pages", "Correct", "Wrong", "Blocked", "Unusable"], rows);
+  return feedTable(["Group", "What it is", "Pages", "Correct", "Wrong", "Blocked", "Unusable"], rows);
 }
 
 /** The decision table, newest first. */
